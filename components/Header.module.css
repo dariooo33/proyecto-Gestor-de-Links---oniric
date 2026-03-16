@@ -1,0 +1,73 @@
+.header {
+  width: 100%;
+  background-color: #494949;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0 24px;
+  color: white;
+}
+
+.nav ul {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 60px;
+}
+
+/* IZQUIERDA - Logo y nombre */
+.izquierda {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.izquierda h1 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.logo img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+/* CENTRO - Buscador */
+.centro {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+}
+
+.centro input {
+  border: solid 1px black ;
+  border-radius: 20;
+  padding-left: 10px;
+}
+
+.centro input:hover {
+  transform: scale(10px);
+}
+
+/* DERECHA - NA */
+.derecha {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.derecha a {
+  text-decoration: none;
+  color: #d3d2d2;
+  font-size: 0.95rem;
+}
+
+.derecha a:hover {
+  color: #0070f3;
+}
