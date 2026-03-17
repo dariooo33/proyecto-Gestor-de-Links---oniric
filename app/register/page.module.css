@@ -34,6 +34,7 @@
   border-radius: 6px;
   font-size: 1rem;
   outline: none;
+  color: black;
 }
 
 .form input:focus {
@@ -84,4 +85,12 @@
 .footer a {
   text-decoration: none;
   color: inherit;
+}
+
+/* Errores */
+.error {
+  color: red;
+  font-size: 0.8rem;
+  margin-top: -8px;
+  margin-bottom: 4px;
 }
