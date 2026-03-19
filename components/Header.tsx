@@ -33,9 +33,9 @@ export default function Header() {
         <ul>
           <div className={styles.izquierda}>
             <div className={styles.logo}>
-              <img src="/logo.png" alt="logo" />
+              <img src="/logo.png" alt="logo" /> {/* Necesito un png - svg para el logo*/}
             </div>
-            <h1>Nombre APP</h1>
+            <h1>GESTOR DE LINKS - ONIRIC VIEW</h1>
           </div>
 
           <div className={styles.centro}>
