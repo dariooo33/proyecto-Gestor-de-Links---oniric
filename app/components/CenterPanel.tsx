@@ -7,7 +7,7 @@ import styles from "../page.module.css";
 
 export function CenterPanel({
   carpeta, subCarpetas, recursos, loading, userId, nivelAcceso,
-  onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta, onOpenPermisos,
+  onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta, onOpenPermisos, onLeaveShared,
 }: {
   carpeta: Carpeta | null;
   subCarpetas: Carpeta[];
@@ -20,6 +20,7 @@ export function CenterPanel({
   onDeleteRecurso: (id: string) => void;
   onDeleteCarpeta: (id: string, nombre: string) => void;
   onOpenPermisos: () => void;
+  onLeaveShared: (carpetaId: string) => void;
 }) {
   const [selectedRecurso, setSelectedRecurso] = useState<Recurso | null>(null);
   useEffect(() => { setSelectedRecurso(null); }, [carpeta?.carpeta_id]);
@@ -69,6 +70,11 @@ export function CenterPanel({
                 🗑 Eliminar
               </button>
             </>
+          )}
+          {!isOwner && nivelAcceso !== null && (
+            <button className={styles.btnSecondary} onClick={() => onLeaveShared(carpeta.carpeta_id)}>
+              🚪 Salir de carpeta
+            </button>
           )}
         </div>
       </div>

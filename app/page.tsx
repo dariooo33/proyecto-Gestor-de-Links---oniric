@@ -10,7 +10,7 @@ import { CenterPanel } from "./components/CenterPanel";
 import { ModalCarpeta, ModalRecurso } from "./components/Modals";
 import { ModalPermisos } from "./components/ModalPermisos";
 import styles from "./page.module.css";
- 
+
 export default function Home() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export default function Home() {
   const [showModalPermisos, setShowModalPermisos] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Sesion ───────────────────────────────────────────────────────────────
+  // ── Sesión ───────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push("/login"); return; }
@@ -140,6 +140,18 @@ export default function Home() {
     if (selectedId) await loadRecursos(selectedId);
   }
 
+  async function handleLeaveShared(carpetaId: string) {
+    if (!userId) return;
+    if (!confirm("¿Quieres eliminar tu acceso a esta carpeta compartida?")) return;
+    const { error } = await supabase.from("Permisos")
+      .delete()
+      .eq("carpeta_id", carpetaId)
+      .eq("user_id", userId);
+    if (error) { setError(error.message); return; }
+    setSelectedId(null);
+    await loadCarpetas();
+  }
+
   const selectedCarpeta = carpetas.find((c) => c.carpeta_id === selectedId) ?? null;
   const subCarpetas = carpetas.filter((c) => c.id_padre === selectedId);
 
@@ -189,6 +201,7 @@ export default function Home() {
             onDeleteRecurso={handleDeleteRecurso}
             onDeleteCarpeta={handleDeleteCarpeta}
             onOpenPermisos={() => setShowModalPermisos(true)}
+            onLeaveShared={handleLeaveShared}
           />
         </div>
       </main>
