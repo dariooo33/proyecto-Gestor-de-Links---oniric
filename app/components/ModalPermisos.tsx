@@ -20,11 +20,13 @@ export function ModalPermisos({ carpeta, userId, onClose }: {
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const loadPermisos = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("Permisos")
-      .select("*, Usuario(nombre, email)")
+      .select("*, Usuario!Permisos_user_id_fkey(nombre, email)")
       .eq("carpeta_id", carpeta.carpeta_id)
-      .eq("owner_id", userId);
+      .neq("user_id", userId);
+    console.log("data:", JSON.stringify(data, null, 2));
+    console.log("error:", JSON.stringify(error, null, 2));
     setPermisos((data as Permiso[]) ?? []);
   }, [carpeta.carpeta_id, userId]);
 
@@ -47,12 +49,20 @@ export function ModalPermisos({ carpeta, userId, onClose }: {
     return () => clearTimeout(timer);
   }, [query, userId]);
 
+  // Obtiene todos los IDs descendientes haciendo una sola query recursiva en DB
+  async function getDescendantIds(rootId: string): Promise<string[]> {
+    // Traemos TODAS las carpetas del árbol completo (no solo las del owner)
+    // para poder calcular correctamente la jerarquía
+    const { data } = await supabase
+      .from("Carpetas")
+      .select("carpeta_id, id_padre, user_id");
+    return getAllDescendantIds(rootId, (data ?? []) as Carpeta[]);
+  }
+
   async function handleAdd(usuario: UsuarioBusqueda) {
     setSaving(true);
     setMsg(null);
-    const { data: todasCarpetas } = await supabase
-      .from("Carpetas").select("carpeta_id, id_padre").eq("user_id", userId);
-    const ids = getAllDescendantIds(carpeta.carpeta_id, (todasCarpetas ?? []) as Carpeta[]);
+    const ids = await getDescendantIds(carpeta.carpeta_id);
     const rows = ids.map((cid) => ({
       carpeta_id: cid, owner_id: userId, user_id: usuario.user_id, nivel: nivelNuevo,
     }));
@@ -64,14 +74,17 @@ export function ModalPermisos({ carpeta, userId, onClose }: {
   }
 
   async function handleChangeNivel(permiso: Permiso, nivel: "lectura" | "edicion") {
-    await supabase.from("Permisos").update({ nivel }).eq("permiso_id", permiso.permiso_id);
+    // Actualizar nivel en la carpeta raíz y todos sus descendientes para ese usuario
+    const ids = await getDescendantIds(carpeta.carpeta_id);
+    await supabase.from("Permisos")
+      .update({ nivel })
+      .eq("user_id", permiso.user_id)
+      .in("carpeta_id", ids);
     await loadPermisos();
   }
 
   async function handleRevoke(permiso: Permiso) {
-    const { data: todasCarpetas } = await supabase
-      .from("Carpetas").select("carpeta_id, id_padre").eq("user_id", userId);
-    const ids = getAllDescendantIds(carpeta.carpeta_id, (todasCarpetas ?? []) as Carpeta[]);
+    const ids = await getDescendantIds(carpeta.carpeta_id);
     await supabase.from("Permisos").delete().eq("user_id", permiso.user_id).in("carpeta_id", ids);
     await loadPermisos();
   }

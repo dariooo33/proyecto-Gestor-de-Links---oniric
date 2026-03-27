@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Carpeta, Recurso, NivelAcceso } from "../types";
 import { fmtDate } from "../helpers";
 import styles from "../page.module.css";
@@ -23,7 +23,21 @@ export function CenterPanel({
   onLeaveShared: (carpetaId: string) => void;
 }) {
   const [selectedRecurso, setSelectedRecurso] = useState<Recurso | null>(null);
-  useEffect(() => { setSelectedRecurso(null); }, [carpeta?.carpeta_id]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setSelectedRecurso(null); setMenuOpen(false); }, [carpeta?.carpeta_id]);
+
+  // Cerrar menú al hacer click fuera
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const canEdit = nivelAcceso === "owner" || nivelAcceso === "edicion";
   const isOwner = nivelAcceso === "owner";
@@ -63,19 +77,35 @@ export function CenterPanel({
         </div>
         <div className={styles.folderActions}>
           {canEdit && <button className={styles.btnPrimary} onClick={onNewRecurso}>+ Recurso</button>}
-          {isOwner && (
-            <>
-              <button className={styles.btnSecondary} onClick={onOpenPermisos}>🔐 Permisos</button>
-              <button className={styles.btnSecondary} onClick={() => onDeleteCarpeta(carpeta.carpeta_id, carpeta.nombre)}>
-                🗑 Eliminar
-              </button>
-            </>
-          )}
-          {!isOwner && nivelAcceso !== null && (
-            <button className={styles.btnSecondary} onClick={() => onLeaveShared(carpeta.carpeta_id)}>
-              🚪 Salir de carpeta
-            </button>
-          )}
+          <div className={styles.menuWrapper} ref={menuRef}>
+            <button
+              className={styles.btnMenu}
+              onClick={() => setMenuOpen((v) => !v)}
+              title="Opciones"
+            >⋯</button>
+            {menuOpen && (
+              <div className={styles.menuDropdown}>
+                {isOwner && (
+                  <>
+                    <button className={styles.menuItem} onClick={() => { setMenuOpen(false); onOpenPermisos(); }}>
+                      <span>🔐</span> Permisos
+                    </button>
+                    <div className={styles.menuDivider} />
+                    <button className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                      onClick={() => { setMenuOpen(false); onDeleteCarpeta(carpeta.carpeta_id, carpeta.nombre); }}>
+                      <span>🗑</span> Eliminar carpeta
+                    </button>
+                  </>
+                )}
+                {!isOwner && nivelAcceso !== null && (
+                  <button className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                    onClick={() => { setMenuOpen(false); onLeaveShared(carpeta.carpeta_id); }}>
+                    <span>🚪</span> Salir de carpeta
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

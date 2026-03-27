@@ -553,3 +553,224 @@
   z-index: 300;
   animation: slideUp .2s ease;
 }
+
+/* ─── Shared badge in sidebar ─────────────────────────────────────────────── */
+.sharedBadge {
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+/* ─── Nivel badge in folder header ───────────────────────────────────────── */
+.nivelBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-left: 10px;
+  vertical-align: middle;
+}
+.nivelBadge[data-nivel="lectura"] {
+  background: rgba(99,102,128,.2);
+  color: var(--text-muted);
+}
+.nivelBadge[data-nivel="edicion"] {
+  background: rgba(78,203,141,.15);
+  color: var(--success);
+}
+
+/* ─── Permisos modal ──────────────────────────────────────────────────────── */
+.permisosDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: -4px;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.searchHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 4px 2px;
+}
+
+.searchResults {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.searchResult {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+}
+.searchResult:last-child { border-bottom: none; }
+.searchResult:hover { background: var(--surface2); }
+
+.searchResultInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.searchResultName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.searchResultEmail {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permisosMsg {
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+}
+.permisosMsgOk {
+  background: rgba(78,203,141,.15);
+  color: var(--success);
+}
+.permisosMsgErr {
+  background: rgba(224,92,106,.15);
+  color: var(--danger);
+}
+
+.permisosList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.permisosRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.permisosUserInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.permisosNombre {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.permisosEmail {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nivelSelect {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color var(--transition);
+}
+.nivelSelect:focus { border-color: var(--accent); }
+.nivelSelect option { background: var(--surface); }
+
+/* ─── Folder actions dropdown ─────────────────────────────────────────────── */
+.menuWrapper {
+  position: relative;
+}
+
+.btnMenu {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  letter-spacing: 1px;
+}
+.btnMenu:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.menuDropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 180px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  z-index: 50;
+  overflow: hidden;
+  animation: slideUp .12s ease;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), color var(--transition);
+}
+.menuItem:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.menuItemDanger:hover {
+  background: rgba(224,92,106,.12);
+  color: var(--danger);
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}

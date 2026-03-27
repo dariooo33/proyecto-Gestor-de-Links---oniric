@@ -55,12 +55,23 @@ export default function Home() {
       compartidas = (data ?? []) as Carpeta[];
     }
 
+    const propiaIds = new Set((propias ?? []).map((c: Carpeta) => c.carpeta_id));
+    const compartidaIds = new Set(compartidas.map((c) => c.carpeta_id));
+    const todasIds = new Set([...propiaIds, ...compartidaIds]);
+
     const todas = [...(propias ?? []) as Carpeta[]];
     compartidas.forEach((c) => {
-      if (!todas.find((t) => t.carpeta_id === c.carpeta_id)) todas.push(c);
+      if (!propiaIds.has(c.carpeta_id)) {
+        // Solo añadir si su padre NO está ya en la lista total (evita duplicar hijos)
+        const padreEnLista = c.id_padre && todasIds.has(c.id_padre);
+        if (!padreEnLista) todas.push(c);
+        else todas.push(c); // Añadirla igual para que buildTree pueda colocarla bajo su padre
+      }
     });
 
-    setCarpetas(todas);
+    // Eliminar duplicados por si acaso
+    const unique = Array.from(new Map(todas.map((c) => [c.carpeta_id, c])).values());
+    setCarpetas(unique);
     setLoadingTree(false);
   }, [userId]);
 
@@ -107,8 +118,27 @@ export default function Home() {
       (c) => c.nombre.toLowerCase() === nombre.toLowerCase() && c.id_padre === parentId
     );
     if (duplicado) { setError(`Ya existe una carpeta llamada "${nombre}" en esa ubicación`); return; }
-    const { error } = await supabase.from("Carpetas").insert({ user_id: userId, id_padre: parentId, nombre });
+
+    const { data: nueva, error } = await supabase
+      .from("Carpetas")
+      .insert({ user_id: userId, id_padre: parentId, nombre })
+      .select()
+      .single();
     if (error) { setError(error.message); return; }
+
+    // Si la carpeta padre pertenece a otro usuario, darle acceso "edicion" a su dueño
+    if (parentId) {
+      const padre = carpetas.find((c) => c.carpeta_id === parentId);
+      if (padre && padre.user_id !== userId) {
+        await supabase.from("Permisos").upsert({
+          carpeta_id: nueva.carpeta_id,
+          owner_id: userId,
+          user_id: padre.user_id,
+          nivel: "edicion",
+        }, { onConflict: "carpeta_id,user_id" });
+      }
+    }
+
     await loadCarpetas();
     setShowModalCarpeta(false);
     if (parentId) setExpandedIds((prev) => new Set([...prev, parentId]));
