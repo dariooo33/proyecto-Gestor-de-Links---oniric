@@ -85,3 +85,18 @@
   border-radius: 20px;
   padding: 5px;
 }
+
+
+.btnAdmin {
+  background: rgba(91, 127, 255, .15);
+  color: #7aa0f7;
+  border: 1px solid rgba(91, 127, 255, .3);
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background .15s;
+}
+.btnAdmin:hover {
+  background: rgba(91, 127, 255, .28);
+}

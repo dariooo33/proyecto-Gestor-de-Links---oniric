@@ -5,18 +5,33 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./Header.module.css";
 
+interface UsuarioSession {
+  email: string;
+  rol: string;
+}
+
 export default function Header() {
   const router = useRouter();
-  // undefined = cargando | null = sin sesión | objeto = con sesión
-  const [usuario, setUsuario] = useState<undefined | null | { email: string }>(undefined);
+  const [usuario, setUsuario] = useState<undefined | null | UsuarioSession>(undefined);
 
   useEffect(() => {
+    async function loadUsuario(userId: string, email: string) {
+      const { data } = await supabase
+        .from("Usuario")
+        .select("rol")
+        .eq("user_id", userId)
+        .single();
+      setUsuario({ email, rol: data?.rol ?? "user" });
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUsuario(session?.user ? { email: session.user.email! } : null);
+      if (session?.user) loadUsuario(session.user.id, session.user.email!);
+      else setUsuario(null);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUsuario(session?.user ? { email: session.user.email! } : null);
+      if (session?.user) loadUsuario(session.user.id, session.user.email!);
+      else setUsuario(null);
     });
 
     return () => subscription.unsubscribe();
@@ -33,7 +48,7 @@ export default function Header() {
         <ul>
           <div className={styles.izquierda}>
             <div className={styles.logo}>
-              <img src="/logo.png" alt="logo" /> {/* Necesito un png - svg para el logo*/}
+              <img src="/logo.png" alt="logo" />
             </div>
             <h1>GESTOR DE LINKS - ONIRIC VIEW</h1>
           </div>
@@ -46,11 +61,14 @@ export default function Header() {
             <li><a href="/">MENU</a></li>
 
             {usuario === undefined ? (
-              // Cargando — no muestra nada para evitar el flash
               <li className={styles.cargando}>...</li>
             ) : usuario ? (
-              // Con sesión
               <>
+                {usuario.rol === "admin" && (
+                  <li>
+                    <a href="/admin" className={styles.btnAdmin}>Admin</a>
+                  </li>
+                )}
                 <li className={styles.email}>{usuario.email}</li>
                 <li>
                   <button onClick={cerrarSesion} className={styles.btnCerrar}>
@@ -59,7 +77,6 @@ export default function Header() {
                 </li>
               </>
             ) : (
-              // Sin sesión
               <>
                 <li><a href="/register">Registro</a></li>
                 <li><a href="/login">Login</a></li>
