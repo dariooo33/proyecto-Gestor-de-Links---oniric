@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabaseClient";
 import { Carpeta, Recurso, NivelAcceso } from "./types";
 import { buildTree } from "./helpers";
@@ -13,6 +13,8 @@ import styles from "./page.module.css";
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const [userId, setUserId] = useState<string | null>(null);
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [recursos, setRecursos] = useState<Recurso[]>([]);
@@ -86,6 +88,25 @@ export default function Home() {
   }, []);
 
   useEffect(() => { if (userId) loadCarpetas(); }, [userId, loadCarpetas]);
+
+  // Seleccionar carpeta desde parámetro ?highlight=
+  useEffect(() => {
+    if (!highlightId || carpetas.length === 0) return;
+    const carpeta = carpetas.find((c) => c.carpeta_id === highlightId);
+    if (!carpeta) return;
+    setSelectedId(highlightId);
+    // Expandir todos los ancestros
+    const ancestros = new Set<string>();
+    let current = carpeta;
+    while (current.id_padre) {
+      ancestros.add(current.id_padre);
+      current = carpetas.find((c) => c.carpeta_id === current.id_padre) ?? current;
+      if (!current.id_padre) break;
+    }
+    setExpandedIds((prev) => new Set([...prev, ...ancestros, highlightId]));
+    // Limpiar el parámetro de la URL sin recargar
+    router.replace("/", { scroll: false });
+  }, [highlightId, carpetas]);
   useEffect(() => {
     if (selectedId) loadRecursos(selectedId);
     else setRecursos([]);
@@ -112,7 +133,7 @@ export default function Home() {
   }
 
   // ── CRUD Carpetas ────────────────────────────────────────────────────────
-  async function handleCreateCarpeta(nombre: string, parentId: string | null) {
+  async function handleCreateCarpeta(nombre: string, parentId: string | null, categoriaId: string | null) {
     if (!userId) return;
     const duplicado = carpetas.some(
       (c) => c.nombre.toLowerCase() === nombre.toLowerCase() && c.id_padre === parentId
@@ -139,6 +160,14 @@ export default function Home() {
       }
     }
 
+    // Si se seleccionó categoría, insertar en Carpetas_Recrusos_Cat
+    if (categoriaId && nueva) {
+      await supabase.from("Carpetas_Recrusos_Cat").insert({
+        carpeta_id: nueva.carpeta_id,
+        categoria_id: categoriaId,
+      });
+    }
+
     await loadCarpetas();
     setShowModalCarpeta(false);
     if (parentId) setExpandedIds((prev) => new Set([...prev, parentId]));
@@ -149,6 +178,13 @@ export default function Home() {
     const { error } = await supabase.from("Carpetas").delete().eq("carpeta_id", carpetaId);
     if (error) { setError(error.message); return; }
     if (selectedId === carpetaId) setSelectedId(null);
+    await loadCarpetas();
+  }
+
+  async function handleTogglePublica(carpetaId: string, publica: boolean) {
+    const { error, data } = await supabase.from("Carpetas").update({ publica }).eq("carpeta_id", carpetaId).select();
+    console.log("togglePublica →", { data, error, carpetaId, publica });
+    if (error) { setError(error.message); return; }
     await loadCarpetas();
   }
 
@@ -232,12 +268,14 @@ export default function Home() {
             onDeleteCarpeta={handleDeleteCarpeta}
             onOpenPermisos={() => setShowModalPermisos(true)}
             onLeaveShared={handleLeaveShared}
+            onTogglePublica={handleTogglePublica}
           />
         </div>
       </main>
 
       {showModalCarpeta && (
         <ModalCarpeta tree={tree} defaultParentId={selectedId}
+          userId={userId ?? ""}
           onClose={() => setShowModalCarpeta(false)} onSave={handleCreateCarpeta} />
       )}
       {showModalRecurso && selectedId && (

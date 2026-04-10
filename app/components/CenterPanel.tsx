@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Carpeta, Recurso, NivelAcceso } from "../types";
+import { Carpeta, Recurso, NivelAcceso, Categoria } from "../types";
 import { fmtDate } from "../helpers";
+import { supabase } from "../../lib/supabaseClient";
 import styles from "../page.module.css";
 
 export function CenterPanel({
   carpeta, subCarpetas, recursos, loading, userId, nivelAcceso,
-  onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta, onOpenPermisos, onLeaveShared,
+  onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta,
+  onOpenPermisos, onLeaveShared, onTogglePublica,
 }: {
   carpeta: Carpeta | null;
   subCarpetas: Carpeta[];
@@ -21,19 +23,50 @@ export function CenterPanel({
   onDeleteCarpeta: (id: string, nombre: string) => void;
   onOpenPermisos: () => void;
   onLeaveShared: (carpetaId: string) => void;
+  onTogglePublica: (carpetaId: string, publica: boolean) => Promise<void>;
 }) {
   const [selectedRecurso, setSelectedRecurso] = useState<Recurso | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setSelectedRecurso(null); setMenuOpen(false); }, [carpeta?.carpeta_id]);
+  // Filtros
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categoriasFiltro, setCategoriasFiltro] = useState<Set<string>>(new Set());
+  const [busquedaLocal, setBusquedaLocal] = useState("");
 
-  // Cerrar menú al hacer click fuera
+  // Cargar categorías de las subcarpetas actuales
+  useEffect(() => {
+    if (!carpeta) return;
+    const ids = subCarpetas.map((c) => c.carpeta_id);
+    if (ids.length === 0) { setCategorias([]); return; }
+    supabase
+      .from("Carpetas_Recrusos_Cat")
+      .select("categoria_id, Categorias(categoria_id, nombre)")
+      .in("carpeta_id", ids)
+      .then(({ data }) => {
+        const seen = new Set<string>();
+        const cats: Categoria[] = [];
+        (data ?? []).forEach((r: any) => {
+          const c = r.Categorias;
+          if (c && !seen.has(c.categoria_id)) {
+            seen.add(c.categoria_id);
+            cats.push(c);
+          }
+        });
+        setCategorias(cats);
+      });
+  }, [carpeta?.carpeta_id, subCarpetas]);
+
+  useEffect(() => {
+    setSelectedRecurso(null);
+    setMenuOpen(false);
+    setCategoriasFiltro(new Set());
+    setBusquedaLocal("");
+  }, [carpeta?.carpeta_id]);
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -41,6 +74,45 @@ export function CenterPanel({
 
   const canEdit = nivelAcceso === "owner" || nivelAcceso === "edicion";
   const isOwner = nivelAcceso === "owner";
+
+  // Aplicar filtros a subcarpetas
+  const [carpetaCategorias, setCarpetaCategorias] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    const ids = subCarpetas.map((c) => c.carpeta_id);
+    if (ids.length === 0) { setCarpetaCategorias({}); return; }
+    supabase
+      .from("Carpetas_Recrusos_Cat")
+      .select("carpeta_id, categoria_id")
+      .in("carpeta_id", ids)
+      .then(({ data }) => {
+        const map: Record<string, string[]> = {};
+        (data ?? []).forEach((r: any) => {
+          if (!map[r.carpeta_id]) map[r.carpeta_id] = [];
+          map[r.carpeta_id].push(r.categoria_id);
+        });
+        setCarpetaCategorias(map);
+      });
+  }, [subCarpetas]);
+
+  const subCarpetasFiltradas = subCarpetas.filter((sc) => {
+    const matchBusqueda = sc.nombre.toLowerCase().includes(busquedaLocal.toLowerCase());
+    const matchCategoria = categoriasFiltro.size === 0 ||
+      (carpetaCategorias[sc.carpeta_id] ?? []).some((cid) => categoriasFiltro.has(cid));
+    return matchBusqueda && matchCategoria;
+  });
+
+  const recursosFiltrados = recursos.filter((r) =>
+    r.nombre.toLowerCase().includes(busquedaLocal.toLowerCase())
+  );
+
+  function toggleCategoria(id: string) {
+    setCategoriasFiltro((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   if (!carpeta) {
     return (
@@ -61,11 +133,13 @@ export function CenterPanel({
 
   return (
     <div>
+      {/* Header */}
       <div className={styles.folderHeader}>
         <div className={styles.folderHeaderIcon}>📂</div>
         <div className={styles.folderHeaderInfo}>
           <div className={styles.folderHeaderName}>
             {carpeta.nombre}
+            {carpeta.publica && <span className={styles.publicaBadge}>🌐 Pública</span>}
             {nivelAcceso === "lectura" && <span className={styles.nivelBadge} data-nivel="lectura">👁 Solo lectura</span>}
             {nivelAcceso === "edicion" && <span className={styles.nivelBadge} data-nivel="edicion">✏️ Edición</span>}
           </div>
@@ -78,17 +152,17 @@ export function CenterPanel({
         <div className={styles.folderActions}>
           {canEdit && <button className={styles.btnPrimary} onClick={onNewRecurso}>+ Recurso</button>}
           <div className={styles.menuWrapper} ref={menuRef}>
-            <button
-              className={styles.btnMenu}
-              onClick={() => setMenuOpen((v) => !v)}
-              title="Opciones"
-            >⋯</button>
+            <button className={styles.btnMenu} onClick={() => setMenuOpen((v) => !v)} title="Opciones">⋯</button>
             {menuOpen && (
               <div className={styles.menuDropdown}>
                 {isOwner && (
                   <>
                     <button className={styles.menuItem} onClick={() => { setMenuOpen(false); onOpenPermisos(); }}>
                       <span>🔐</span> Permisos
+                    </button>
+                    <button className={styles.menuItem} onClick={() => { setMenuOpen(false); onTogglePublica(carpeta.carpeta_id, !carpeta.publica); }}>
+                      <span>{carpeta.publica ? "🔒" : "🌐"}</span>
+                      {carpeta.publica ? "Hacer privada" : "Hacer pública"}
                     </button>
                     <div className={styles.menuDivider} />
                     <button className={`${styles.menuItem} ${styles.menuItemDanger}`}
@@ -109,13 +183,42 @@ export function CenterPanel({
         </div>
       </div>
 
-      {subCarpetas.length > 0 && (
+      {/* Barra de filtros */}
+      <div className={styles.filterBar}>
+        <input
+          className={styles.filterSearch}
+          value={busquedaLocal}
+          onChange={(e) => setBusquedaLocal(e.target.value)}
+          placeholder="Buscar en esta carpeta…"
+        />
+        {categorias.length > 0 && (
+          <div className={styles.filterCategorias}>
+            {categorias.map((cat) => (
+              <button
+                key={cat.categoria_id}
+                className={`${styles.filterChip} ${categoriasFiltro.has(cat.categoria_id) ? styles.filterChipActive : ""}`}
+                onClick={() => toggleCategoria(cat.categoria_id)}
+              >
+                {cat.nombre}
+              </button>
+            ))}
+            {categoriasFiltro.size > 0 && (
+              <button className={styles.filterClear} onClick={() => setCategoriasFiltro(new Set())}>
+                × Limpiar
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Subcarpetas */}
+      {subCarpetasFiltradas.length > 0 && (
         <>
           <div className={styles.sectionTitle}>Subcarpetas</div>
           <div className={styles.folderGrid}>
-            {subCarpetas.map((sc) => (
+            {subCarpetasFiltradas.map((sc) => (
               <div key={sc.carpeta_id} className={styles.folderCard} onClick={() => onSelectCarpeta(sc.carpeta_id)}>
-                <div className={styles.folderCardIcon}>📁</div>
+                <div className={styles.folderCardIcon}>{sc.publica ? "🌐" : "📁"}</div>
                 <div className={styles.folderCardName}>{sc.nombre}</div>
                 <div className={styles.folderCardMeta}>Creada {fmtDate(sc.created_at)}</div>
               </div>
@@ -124,11 +227,12 @@ export function CenterPanel({
         </>
       )}
 
-      {recursos.length > 0 && (
+      {/* Recursos */}
+      {recursosFiltrados.length > 0 && (
         <>
           <div className={styles.sectionTitle}>Recursos</div>
           <div className={styles.resourceList}>
-            {recursos.map((r) => (
+            {recursosFiltrados.map((r) => (
               <div key={r.recurso_id} className={styles.resourceRow}
                 onClick={() => setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r)}>
                 <span className={styles.resourceIcon}>📄</span>
@@ -163,10 +267,12 @@ export function CenterPanel({
         </div>
       )}
 
-      {subCarpetas.length === 0 && recursos.length === 0 && (
+      {subCarpetasFiltradas.length === 0 && recursosFiltrados.length === 0 && (
         <div className={styles.emptyState} style={{ marginTop: 60 }}>
           <div className={styles.emptyIcon}>📭</div>
-          <div className={styles.emptyText}>Esta carpeta está vacía</div>
+          <div className={styles.emptyText}>
+            {busquedaLocal || categoriasFiltro.size > 0 ? "Sin resultados para ese filtro" : "Esta carpeta está vacía"}
+          </div>
         </div>
       )}
     </div>

@@ -1,9 +1,17 @@
+export interface Categoria {
+  categoria_id: string;
+  nombre: string;
+  descripcion: string;
+  created_at: string;
+}
+
 export interface Carpeta {
   carpeta_id: string;
   user_id: string;
   id_padre: string | null;
   nombre: string;
   created_at: string;
+  publica: boolean;
 }
 
 export interface Recurso {

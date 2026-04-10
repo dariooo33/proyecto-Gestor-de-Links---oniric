@@ -533,6 +533,55 @@
   font-size: 12px;
 }
 
+.modalLabelOpt {
+  font-weight: 400;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 10px;
+}
+
+.categoriaRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btnNuevaCategoria {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 7px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.btnNuevaCategoria:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.nuevaCategoriaBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.nuevaCategoriaActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .modalActions {
   display: flex;
   gap: 8px;
@@ -773,4 +822,94 @@
   height: 1px;
   background: var(--border);
   margin: 2px 0;
+}
+
+/* ─── Filter bar ──────────────────────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.filterSearch {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-body);
+  padding: 7px 11px;
+  outline: none;
+  width: 100%;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.filterSearch:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.filterSearch::placeholder { color: var(--text-muted); }
+
+.filterCategorias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.filterChip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.filterChip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.filterChipActive {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.filterClear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  transition: color var(--transition), background var(--transition);
+}
+.filterClear:hover {
+  color: var(--danger);
+  background: rgba(224,92,106,.1);
+}
+
+/* ─── Publica badge ───────────────────────────────────────────────────────── */
+.publicaBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-left: 10px;
+  vertical-align: middle;
+  background: rgba(78,203,141,.12);
+  color: var(--success);
+  border: 1px solid rgba(78,203,141,.25);
 }
