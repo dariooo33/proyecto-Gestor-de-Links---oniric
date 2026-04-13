@@ -93,20 +93,32 @@ export default function Home() {
   useEffect(() => {
     if (!highlightId || carpetas.length === 0) return;
     const carpeta = carpetas.find((c) => c.carpeta_id === highlightId);
-    if (!carpeta) return;
+
+    if (!carpeta) {
+      // No está en nuestra lista — puede ser carpeta pública de otro usuario
+      // Buscarla en la DB para obtener su dueño y redirigir
+      supabase.from("Carpetas").select("carpeta_id, user_id").eq("carpeta_id", highlightId).single()
+        .then(({ data }) => {
+          if (data && data.user_id !== userId) {
+            router.replace(`/usuario/${data.user_id}`);
+          }
+        });
+      return;
+    }
+
     setSelectedId(highlightId);
     // Expandir todos los ancestros
     const ancestros = new Set<string>();
-    let current = carpeta;
+    let current: Carpeta = carpeta;
     while (current.id_padre) {
       ancestros.add(current.id_padre);
-      current = carpetas.find((c) => c.carpeta_id === current.id_padre) ?? current;
-      if (!current.id_padre) break;
+      const padre = carpetas.find((c) => c.carpeta_id === current.id_padre);
+      if (!padre) break;
+      current = padre;
     }
     setExpandedIds((prev) => new Set([...prev, ...ancestros, highlightId]));
-    // Limpiar el parámetro de la URL sin recargar
     router.replace("/", { scroll: false });
-  }, [highlightId, carpetas]);
+  }, [highlightId, carpetas, userId]);
   useEffect(() => {
     if (selectedId) loadRecursos(selectedId);
     else setRecursos([]);
@@ -182,8 +194,12 @@ export default function Home() {
   }
 
   async function handleTogglePublica(carpetaId: string, publica: boolean) {
-    const { error, data } = await supabase.from("Carpetas").update({ publica }).eq("carpeta_id", carpetaId).select();
-    console.log("togglePublica →", { data, error, carpetaId, publica });
+    // Obtener todos los IDs descendientes
+    const { data: todasCarpetas } = await supabase.from("Carpetas").select("carpeta_id, id_padre");
+    const { getAllDescendantIds } = await import("./helpers");
+    const ids = getAllDescendantIds(carpetaId, (todasCarpetas ?? []) as Carpeta[]);
+    const { error } = await supabase.from("Carpetas").update({ publica }).in("carpeta_id", ids);
+    console.log("togglePublica cascada →", { ids, error, publica });
     if (error) { setError(error.message); return; }
     await loadCarpetas();
   }
