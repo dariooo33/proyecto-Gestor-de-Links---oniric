@@ -68,12 +68,22 @@ export default function Header() {
     const term = q.trim();
     const resultados: ResultadoBusqueda[] = [];
 
-    // Carpetas propias + públicas
+    // IDs de carpetas compartidas con el usuario
+    const { data: permisosData } = await supabase
+      .from("Permisos")
+      .select("carpeta_id")
+      .eq("user_id", userId);
+    const sharedIds = (permisosData ?? []).map((p: any) => p.carpeta_id as string);
+
+    // Carpetas propias + públicas + compartidas con el usuario
+    let carpetasFilter = `user_id.eq.${userId},publica.eq.true`;
+    if (sharedIds.length > 0) carpetasFilter += `,carpeta_id.in.(${sharedIds.join(",")})`;
+
     const { data: carpetas } = await supabase
       .from("Carpetas")
       .select("carpeta_id, nombre, user_id, publica")
       .ilike("nombre", `%${term}%`)
-      .or(`user_id.eq.${userId},publica.eq.true`)
+      .or(carpetasFilter)
       .limit(5);
 
     (carpetas ?? []).forEach((c: any) => {
@@ -81,7 +91,11 @@ export default function Header() {
         tipo: "carpeta",
         id: c.carpeta_id,
         titulo: c.nombre,
-        subtitulo: c.user_id === userId ? "Tu carpeta" : "Carpeta pública",
+        subtitulo: c.user_id === userId
+          ? "Tu carpeta"
+          : sharedIds.includes(c.carpeta_id)
+            ? "Compartida contigo"
+            : "Carpeta pública",
       });
     });
 
