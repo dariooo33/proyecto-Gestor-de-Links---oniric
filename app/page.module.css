@@ -913,3 +913,62 @@
   color: var(--success);
   border: 1px solid rgba(78,203,141,.25);
 }
+
+/* Badge de categoría en el header de la carpeta */
+.categoriaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(91, 127, 255, .12);
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  margin-left: 6px;
+}
+
+/* Selector de categoría inline dentro del dropdown */
+.menuCategoriaSelector {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface2);
+}
+
+.menuCategoriaSelect {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.menuCategoriaSelect:focus {
+  border-color: var(--accent);
+}
+
+.menuCategoriaQuitar {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 11px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  opacity: 0.8;
+  transition: opacity .15s;
+}
+.menuCategoriaQuitar:hover {
+  opacity: 1;
+}

@@ -64,14 +64,12 @@ export default function Home() {
     const todas = [...(propias ?? []) as Carpeta[]];
     compartidas.forEach((c) => {
       if (!propiaIds.has(c.carpeta_id)) {
-        // Solo añadir si su padre NO está ya en la lista total (evita duplicar hijos)
         const padreEnLista = c.id_padre && todasIds.has(c.id_padre);
         if (!padreEnLista) todas.push(c);
-        else todas.push(c); // Añadirla igual para que buildTree pueda colocarla bajo su padre
+        else todas.push(c);
       }
     });
 
-    // Eliminar duplicados por si acaso
     const unique = Array.from(new Map(todas.map((c) => [c.carpeta_id, c])).values());
     setCarpetas(unique);
     setLoadingTree(false);
@@ -95,8 +93,6 @@ export default function Home() {
     const carpeta = carpetas.find((c) => c.carpeta_id === highlightId);
 
     if (!carpeta) {
-      // No está en nuestra lista — puede ser carpeta pública de otro usuario
-      // Buscarla en la DB para obtener su dueño y redirigir
       supabase.from("Carpetas").select("carpeta_id, user_id").eq("carpeta_id", highlightId).single()
         .then(({ data }) => {
           if (data && data.user_id !== userId) {
@@ -107,7 +103,6 @@ export default function Home() {
     }
 
     setSelectedId(highlightId);
-    // Expandir todos los ancestros
     const ancestros = new Set<string>();
     let current: Carpeta = carpeta;
     while (current.id_padre) {
@@ -119,6 +114,7 @@ export default function Home() {
     setExpandedIds((prev) => new Set([...prev, ...ancestros, highlightId]));
     router.replace("/", { scroll: false });
   }, [highlightId, carpetas, userId]);
+
   useEffect(() => {
     if (selectedId) loadRecursos(selectedId);
     else setRecursos([]);
@@ -155,9 +151,10 @@ export default function Home() {
     const { data: nueva, error } = await supabase
       .from("Carpetas")
       .insert({ user_id: userId, id_padre: parentId, nombre })
-      .select()
+      .select("carpeta_id, user_id, nombre, id_padre, publica, created_at")
       .single();
-    if (error) { setError(error.message); return; }
+
+    if (error || !nueva) { setError(error?.message ?? "Error al crear carpeta"); return; }
 
     // Si la carpeta padre pertenece a otro usuario, darle acceso "edicion" a su dueño
     if (parentId) {
@@ -172,12 +169,13 @@ export default function Home() {
       }
     }
 
-    // Si se seleccionó categoría, insertar en Carpetas_Recrusos_Cat
-    if (categoriaId && nueva) {
-      await supabase.from("Carpetas_Recrusos_Cat").insert({
+    // Insertar categoría si se seleccionó una
+    if (categoriaId) {
+      const { error: catError } = await supabase.from("Carpetas_Recrusos_Categoria").insert({
         carpeta_id: nueva.carpeta_id,
         categoria_id: categoriaId,
       });
+      if (catError) setError(`Carpeta creada pero error al asignar categoría: ${catError.message}`);
     }
 
     await loadCarpetas();
@@ -194,13 +192,31 @@ export default function Home() {
   }
 
   async function handleTogglePublica(carpetaId: string, publica: boolean) {
-    // Obtener todos los IDs descendientes
     const { data: todasCarpetas } = await supabase.from("Carpetas").select("carpeta_id, id_padre");
     const { getAllDescendantIds } = await import("./helpers");
     const ids = getAllDescendantIds(carpetaId, (todasCarpetas ?? []) as Carpeta[]);
     const { error } = await supabase.from("Carpetas").update({ publica }).in("carpeta_id", ids);
-    console.log("togglePublica cascada →", { ids, error, publica });
     if (error) { setError(error.message); return; }
+    await loadCarpetas();
+  }
+
+  // ── Gestión de categoría de carpeta ─────────────────────────────────────
+  async function handleSetCategoria(carpetaId: string, categoriaId: string | null) {
+    // Eliminar categoría existente
+    await supabase.from("Carpetas_Recrusos_Categoria")
+      .delete()
+      .eq("carpeta_id", carpetaId)
+      .not("carpeta_id", "is", null);
+
+    // Insertar nueva si se seleccionó una
+    if (categoriaId) {
+      const { error } = await supabase.from("Carpetas_Recrusos_Categoria").insert({
+        carpeta_id: carpetaId,
+        categoria_id: categoriaId,
+      });
+      if (error) { setError(error.message); return; }
+    }
+
     await loadCarpetas();
   }
 
@@ -285,6 +301,7 @@ export default function Home() {
             onOpenPermisos={() => setShowModalPermisos(true)}
             onLeaveShared={handleLeaveShared}
             onTogglePublica={handleTogglePublica}
+            onSetCategoria={handleSetCategoria}
           />
         </div>
       </main>

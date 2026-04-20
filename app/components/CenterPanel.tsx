@@ -9,7 +9,7 @@ import styles from "../page.module.css";
 export function CenterPanel({
   carpeta, subCarpetas, recursos, loading, userId, nivelAcceso,
   onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta,
-  onOpenPermisos, onLeaveShared, onTogglePublica,
+  onOpenPermisos, onLeaveShared, onTogglePublica, onSetCategoria,
 }: {
   carpeta: Carpeta | null;
   subCarpetas: Carpeta[];
@@ -24,6 +24,7 @@ export function CenterPanel({
   onOpenPermisos: () => void;
   onLeaveShared: (carpetaId: string) => void;
   onTogglePublica: (carpetaId: string, publica: boolean) => Promise<void>;
+  onSetCategoria: (carpetaId: string, categoriaId: string | null) => Promise<void>;
 }) {
   const [selectedRecurso, setSelectedRecurso] = useState<Recurso | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -34,7 +35,33 @@ export function CenterPanel({
   const [categoriasFiltro, setCategoriasFiltro] = useState<Set<string>>(new Set());
   const [busquedaLocal, setBusquedaLocal] = useState("");
 
-  // Cargar categorías de las subcarpetas actuales
+  // Categoría actual de la carpeta seleccionada y todas las categorías disponibles
+  const [todasCategorias, setTodasCategorias] = useState<Categoria[]>([]);
+  const [categoriaActual, setCategoriaActual] = useState<string | null>(null);
+  const [showCategoriaSelector, setShowCategoriaSelector] = useState(false);
+  const [savingCategoria, setSavingCategoria] = useState(false);
+
+  // Cargar todas las categorías disponibles una sola vez
+  useEffect(() => {
+    supabase.from("Categorias").select("categoria_id, nombre").order("nombre")
+      .then(({ data }) => setTodasCategorias((data as Categoria[]) ?? []));
+  }, []);
+
+  // Cargar categoría actual de la carpeta seleccionada
+  useEffect(() => {
+    if (!carpeta) { setCategoriaActual(null); return; }
+    supabase
+      .from("Carpetas_Recrusos_Cat")
+      .select("categoria_id")
+      .eq("carpeta_id", carpeta.carpeta_id)
+      .not("categoria_id", "is", null)
+      .maybeSingle()
+      .then(({ data }) => {
+        setCategoriaActual(data?.categoria_id ?? null);
+      });
+  }, [carpeta?.carpeta_id]);
+
+  // Cargar categorías de las subcarpetas actuales (para filtros)
   useEffect(() => {
     if (!carpeta) return;
     const ids = subCarpetas.map((c) => c.carpeta_id);
@@ -60,13 +87,17 @@ export function CenterPanel({
   useEffect(() => {
     setSelectedRecurso(null);
     setMenuOpen(false);
+    setShowCategoriaSelector(false);
     setCategoriasFiltro(new Set());
     setBusquedaLocal("");
   }, [carpeta?.carpeta_id]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+        setShowCategoriaSelector(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -75,7 +106,7 @@ export function CenterPanel({
   const canEdit = nivelAcceso === "owner" || nivelAcceso === "edicion";
   const isOwner = nivelAcceso === "owner";
 
-  // Aplicar filtros a subcarpetas
+  // Mapa carpeta → categorías para el filtro
   const [carpetaCategorias, setCarpetaCategorias] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -114,6 +145,16 @@ export function CenterPanel({
     });
   }
 
+  async function handleGuardarCategoria(nuevaCategoriaId: string | null) {
+    if (!carpeta) return;
+    setSavingCategoria(true);
+    await onSetCategoria(carpeta.carpeta_id, nuevaCategoriaId);
+    setCategoriaActual(nuevaCategoriaId);
+    setSavingCategoria(false);
+    setShowCategoriaSelector(false);
+    setMenuOpen(false);
+  }
+
   if (!carpeta) {
     return (
       <div className={styles.emptyState}>
@@ -131,6 +172,8 @@ export function CenterPanel({
     );
   }
 
+  const categoriaActualNombre = todasCategorias.find(c => c.categoria_id === categoriaActual)?.nombre;
+
   return (
     <div>
       {/* Header */}
@@ -142,6 +185,9 @@ export function CenterPanel({
             {carpeta.publica && <span className={styles.publicaBadge}>🌐 Pública</span>}
             {nivelAcceso === "lectura" && <span className={styles.nivelBadge} data-nivel="lectura">👁 Solo lectura</span>}
             {nivelAcceso === "edicion" && <span className={styles.nivelBadge} data-nivel="edicion">✏️ Edición</span>}
+            {categoriaActualNombre && (
+              <span className={styles.categoriaBadge}>🏷️ {categoriaActualNombre}</span>
+            )}
           </div>
           <div className={styles.folderHeaderMeta}>
             {subCarpetas.length} subcarpeta{subCarpetas.length !== 1 ? "s" : ""}
@@ -152,7 +198,7 @@ export function CenterPanel({
         <div className={styles.folderActions}>
           {canEdit && <button className={styles.btnPrimary} onClick={onNewRecurso}>+ Recurso</button>}
           <div className={styles.menuWrapper} ref={menuRef}>
-            <button className={styles.btnMenu} onClick={() => setMenuOpen((v) => !v)} title="Opciones">⋯</button>
+            <button className={styles.btnMenu} onClick={() => { setMenuOpen((v) => !v); setShowCategoriaSelector(false); }} title="Opciones">⋯</button>
             {menuOpen && (
               <div className={styles.menuDropdown}>
                 {isOwner && (
@@ -164,6 +210,42 @@ export function CenterPanel({
                       <span>{carpeta.publica ? "🔒" : "🌐"}</span>
                       {carpeta.publica ? "Hacer privada" : "Hacer pública"}
                     </button>
+
+                    {/* ── Categoría ── */}
+                    <button
+                      className={styles.menuItem}
+                      onClick={() => setShowCategoriaSelector((v) => !v)}
+                    >
+                      <span>🏷️</span>
+                      {categoriaActual ? "Cambiar categoría" : "Asignar categoría"}
+                    </button>
+
+                    {showCategoriaSelector && (
+                      <div className={styles.menuCategoriaSelector}>
+                        <select
+                          className={styles.menuCategoriaSelect}
+                          value={categoriaActual ?? ""}
+                          onChange={(e) => handleGuardarCategoria(e.target.value || null)}
+                          disabled={savingCategoria}
+                          autoFocus
+                        >
+                          <option value="">Sin categoría</option>
+                          {todasCategorias.map((c) => (
+                            <option key={c.categoria_id} value={c.categoria_id}>{c.nombre}</option>
+                          ))}
+                        </select>
+                        {categoriaActual && (
+                          <button
+                            className={styles.menuCategoriaQuitar}
+                            disabled={savingCategoria}
+                            onClick={() => handleGuardarCategoria(null)}
+                          >
+                            × Quitar categoría
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     <div className={styles.menuDivider} />
                     <button className={`${styles.menuItem} ${styles.menuItemDanger}`}
                       onClick={() => { setMenuOpen(false); onDeleteCarpeta(carpeta.carpeta_id, carpeta.nombre); }}>
