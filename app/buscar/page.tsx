@@ -75,7 +75,7 @@ export default function BuscarPage() {
 
       // Carpetas que tienen esa categoría asignada
       const { data: catCarpetas } = await supabase
-        .from("Carpetas_Recrusos_Cat")
+        .from("Carpetas_Recrusos_Categoria")
         .select("carpeta_id")
         .eq("categoria_id", categoriaFiltro)
         .not("carpeta_id", "is", null);
@@ -84,7 +84,7 @@ export default function BuscarPage() {
 
       // Recursos que tienen esa categoría asignada
       const { data: catRecursos } = await supabase
-        .from("Carpetas_Recrusos_Cat")
+        .from("Carpetas_Recrusos_Categoria")
         .select("recurso_id")
         .eq("categoria_id", categoriaFiltro)
         .not("recurso_id", "is", null);

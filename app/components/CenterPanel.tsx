@@ -51,7 +51,7 @@ export function CenterPanel({
   useEffect(() => {
     if (!carpeta) { setCategoriaActual(null); return; }
     supabase
-      .from("Carpetas_Recrusos_Cat")
+      .from("Carpetas_Recrusos_Categoria")
       .select("categoria_id")
       .eq("carpeta_id", carpeta.carpeta_id)
       .not("categoria_id", "is", null)
@@ -67,7 +67,7 @@ export function CenterPanel({
     const ids = subCarpetas.map((c) => c.carpeta_id);
     if (ids.length === 0) { setCategorias([]); return; }
     supabase
-      .from("Carpetas_Recrusos_Cat")
+      .from("Carpetas_Recrusos_Categoria")
       .select("categoria_id, Categorias(categoria_id, nombre)")
       .in("carpeta_id", ids)
       .then(({ data }) => {
@@ -113,7 +113,7 @@ export function CenterPanel({
     const ids = subCarpetas.map((c) => c.carpeta_id);
     if (ids.length === 0) { setCarpetaCategorias({}); return; }
     supabase
-      .from("Carpetas_Recrusos_Cat")
+      .from("Carpetas_Recrusos_Categoria")
       .select("carpeta_id, categoria_id")
       .in("carpeta_id", ids)
       .then(({ data }) => {

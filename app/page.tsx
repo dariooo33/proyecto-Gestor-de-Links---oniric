@@ -206,7 +206,7 @@ export default function Home() {
     await supabase.from("Carpetas_Recrusos_Categoria")
       .delete()
       .eq("carpeta_id", carpetaId)
-      .not("carpeta_id", "is", null);
+      
 
     // Insertar nueva si se seleccionó una
     if (categoriaId) {
