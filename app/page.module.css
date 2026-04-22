@@ -1118,3 +1118,135 @@
   background: var(--surface2);
   border-bottom: 1px solid var(--border-soft);
 }
+
+
+
+
+/* ── Menú contextual ─────────────────────────────────────────────────────── */
+.contextMenu {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 192px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.2);
+  overflow: hidden;
+  animation: fadeDown .1s ease;
+  user-select: none;
+}
+
+.contextMenuHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px 6px;
+  pointer-events: none;
+}
+
+.contextMenuIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.contextMenuTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+/* ── Renombrado inline ───────────────────────────────────────────────────── */
+.nodeRenameInput {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-body);
+  padding: 1px 6px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  min-width: 0;
+}
+
+/* ── Drag & Drop ─────────────────────────────────────────────────────────── */
+.treeNodeDragging {
+  opacity: 0.4;
+  background: var(--surface2) !important;
+}
+
+.treeNodeDragOver {
+  background: var(--accent-dim) !important;
+  color: var(--accent) !important;
+  border-radius: 7px;
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+/* ── Lista scrolleable etiquetas (EtiquetasPicker) ───────────────────────── */
+.etiquetaListBox {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-top: 4px;
+  background: var(--bg);
+}
+
+.etiquetaListItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: background .12s;
+}
+.etiquetaListItem:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+.etiquetaListItemOn {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 500;
+}
+.etiquetaListItemOn:hover {
+  background: var(--accent-dim);
+}
+
+.etiquetaListCheck {
+  width: 14px;
+  font-size: 11px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ── Dropdown de etiquetas en página de búsqueda ─────────────────────────── */
+.etiquetasDropdownPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  overflow: hidden;
+  animation: fadeDown .1s ease;
+}
+
+.etiquetasDropdownList {
+  max-height: 200px;
+  overflow-y: auto;
+}

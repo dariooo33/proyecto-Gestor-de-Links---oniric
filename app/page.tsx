@@ -28,6 +28,12 @@ export default function Home() {
   const [showModalPermisos, setShowModalPermisos] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // parentId preseleccionado al abrir modal desde el menú contextual
+  const [defaultParentId, setDefaultParentId] = useState<string | null>(null);
+
+  // carpeta sobre la que se abre el modal de permisos (puede ser distinta a selectedCarpeta)
+  const [carpetaPermisos, setCarpetaPermisos] = useState<Carpeta | null>(null);
+
   // ── Sesión ───────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,16 +64,11 @@ export default function Home() {
     }
 
     const propiaIds = new Set((propias ?? []).map((c: Carpeta) => c.carpeta_id));
-    const compartidaIds = new Set(compartidas.map((c) => c.carpeta_id));
-    const todasIds = new Set([...propiaIds, ...compartidaIds]);
+    const todasIds = new Set([...propiaIds, ...compartidas.map((c) => c.carpeta_id)]);
 
     const todas = [...(propias ?? []) as Carpeta[]];
     compartidas.forEach((c) => {
-      if (!propiaIds.has(c.carpeta_id)) {
-        const padreEnLista = c.id_padre && todasIds.has(c.id_padre);
-        if (!padreEnLista) todas.push(c);
-        else todas.push(c);
-      }
+      if (!propiaIds.has(c.carpeta_id)) todas.push(c);
     });
 
     const unique = Array.from(new Map(todas.map((c) => [c.carpeta_id, c])).values());
@@ -90,7 +91,6 @@ export default function Home() {
   useEffect(() => {
     if (!highlightId || carpetas.length === 0) return;
     const carpeta = carpetas.find((c) => c.carpeta_id === highlightId);
-
     if (!carpeta) {
       supabase.from("Carpetas").select("carpeta_id, user_id").eq("carpeta_id", highlightId).single()
         .then(({ data }) => {
@@ -98,7 +98,6 @@ export default function Home() {
         });
       return;
     }
-
     setSelectedId(highlightId);
     const ancestros = new Set<string>();
     let current: Carpeta = carpeta;
@@ -178,18 +177,15 @@ export default function Home() {
       if (catError) setError(`Carpeta creada pero error al asignar categoría: ${catError.message}`);
     }
 
-    // Insertar etiquetas si se seleccionaron
     if (etiquetaIds.length > 0) {
-      const rows = etiquetaIds.map((eid) => ({
-        carpeta_id: nueva.carpeta_id,
-        etiqueta_id: eid,
-      }));
+      const rows = etiquetaIds.map((eid) => ({ carpeta_id: nueva.carpeta_id, etiqueta_id: eid }));
       const { error: etqError } = await supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows);
       if (etqError) setError(`Carpeta creada pero error al asignar etiquetas: ${etqError.message}`);
     }
 
     await loadCarpetas();
     setShowModalCarpeta(false);
+    setDefaultParentId(null);
     if (parentId) setExpandedIds((prev) => new Set([...prev, parentId]));
   }
 
@@ -198,6 +194,42 @@ export default function Home() {
     const { error } = await supabase.from("Carpetas").delete().eq("carpeta_id", carpetaId);
     if (error) { setError(error.message); return; }
     if (selectedId === carpetaId) setSelectedId(null);
+    await loadCarpetas();
+  }
+
+  // ── NUEVO: Renombrar carpeta ──────────────────────────────────────────────
+  async function handleRenameCarpeta(carpetaId: string, nuevoNombre: string) {
+    const { error } = await supabase
+      .from("Carpetas")
+      .update({ nombre: nuevoNombre })
+      .eq("carpeta_id", carpetaId);
+    if (error) { setError(error.message); return; }
+    await loadCarpetas();
+  }
+
+  // ── NUEVO: Mover carpeta (drag & drop) ───────────────────────────────────
+  async function handleMoveCarpeta(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+
+    // Evitar mover a un descendiente (causaría ciclo en el árbol)
+    const esDescendiente = (posibleHijoId: string, raizId: string): boolean => {
+      const hijos = carpetas.filter((c) => c.id_padre === raizId);
+      return hijos.some(
+        (h) => h.carpeta_id === posibleHijoId || esDescendiente(posibleHijoId, h.carpeta_id)
+      );
+    };
+    if (esDescendiente(targetId, draggedId)) {
+      setError("No puedes mover una carpeta dentro de una de sus subcarpetas.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("Carpetas")
+      .update({ id_padre: targetId })
+      .eq("carpeta_id", draggedId);
+    if (error) { setError(error.message); return; }
+
+    setExpandedIds((prev) => new Set([...prev, targetId]));
     await loadCarpetas();
   }
 
@@ -210,32 +242,27 @@ export default function Home() {
     await loadCarpetas();
   }
 
-  // ── Gestión de categoría ─────────────────────────────────────────────────
   async function handleSetCategoria(carpetaId: string, categoriaId: string | null) {
     await supabase.from("Carpetas_Recrusos_Categoria").delete().eq("carpeta_id", carpetaId);
     if (categoriaId) {
       const { error } = await supabase.from("Carpetas_Recrusos_Categoria").insert({
-        carpeta_id: carpetaId,
-        categoria_id: categoriaId,
+        carpeta_id: carpetaId, categoria_id: categoriaId,
       });
       if (error) { setError(error.message); return; }
     }
     await loadCarpetas();
   }
 
-  // ── Gestión de etiquetas ─────────────────────────────────────────────────
   async function handleSetEtiquetas(
     carpetaId: string | null,
     recursoId: string | null,
     etiquetaIds: string[]
   ) {
-    // Borrar todas las etiquetas actuales de la entidad
     const deleteQuery = supabase.from("Carpetas_Recrusos_Etiquetas").delete();
     if (carpetaId) deleteQuery.eq("carpeta_id", carpetaId);
     else if (recursoId) deleteQuery.eq("recurso_id", recursoId);
     await deleteQuery;
 
-    // Insertar las nuevas
     if (etiquetaIds.length > 0) {
       const rows = etiquetaIds.map((eid) => ({
         ...(carpetaId ? { carpeta_id: carpetaId } : {}),
@@ -247,13 +274,11 @@ export default function Home() {
     }
   }
 
-  // ── CRUD Recursos ────────────────────────────────────────────────────────
   async function handleCreateRecurso(nombre: string, contenido: string, etiquetaIds: string[]) {
     if (!selectedId || !userId) return;
     const { data: nuevo, error } = await supabase.from("Recursos")
       .insert({ user_id: userId, carpeta_id: selectedId, nombre, contenido })
-      .select("recurso_id")
-      .single();
+      .select("recurso_id").single();
     if (error || !nuevo) { setError(error?.message ?? "Error al crear recurso"); return; }
 
     if (etiquetaIds.length > 0) {
@@ -295,7 +320,10 @@ export default function Home() {
             FileManager
           </div>
           <nav className={styles.topNav}>
-            <button className={styles.btnPrimary} onClick={() => setShowModalCarpeta(true)}>
+            <button className={styles.btnPrimary} onClick={() => {
+              setDefaultParentId(selectedId);
+              setShowModalCarpeta(true);
+            }}>
               + Nueva Carpeta
             </button>
           </nav>
@@ -313,11 +341,29 @@ export default function Home() {
             </div>
           ) : (
             <SidebarTree
-              nodes={tree} depth={0}
-              selectedId={selectedId} expandedIds={expandedIds}
-              onSelect={setSelectedId} onToggle={toggleExpanded}
+              nodes={tree}
+              depth={0}
+              selectedId={selectedId}
+              expandedIds={expandedIds}
+              onSelect={setSelectedId}
+              onToggle={toggleExpanded}
               onDelete={handleDeleteCarpeta}
-              sharedIds={sharedIds} userId={userId}
+              onRename={handleRenameCarpeta}
+              onMove={handleMoveCarpeta}
+              onNewFolder={(parentId) => {
+                setDefaultParentId(parentId);
+                setShowModalCarpeta(true);
+              }}
+              onNewResource={(parentId) => {
+                setSelectedId(parentId);
+                setShowModalRecurso(true);
+              }}
+              onOpenPermisos={(node) => {
+                setCarpetaPermisos(carpetas.find((c) => c.carpeta_id === node.carpeta_id) ?? null);
+                setShowModalPermisos(true);
+              }}
+              sharedIds={sharedIds}
+              userId={userId}
             />
           )}
         </div>
@@ -341,16 +387,27 @@ export default function Home() {
       </main>
 
       {showModalCarpeta && (
-        <ModalCarpeta tree={tree} defaultParentId={selectedId}
+        <ModalCarpeta
+          tree={tree}
+          defaultParentId={defaultParentId}
           userId={userId ?? ""}
-          onClose={() => setShowModalCarpeta(false)} onSave={handleCreateCarpeta} />
+          onClose={() => { setShowModalCarpeta(false); setDefaultParentId(null); }}
+          onSave={handleCreateCarpeta}
+        />
       )}
       {showModalRecurso && selectedId && (
         <ModalRecurso onClose={() => setShowModalRecurso(false)} onSave={handleCreateRecurso} />
       )}
-      {showModalPermisos && selectedCarpeta && userId && (
-        <ModalPermisos carpeta={selectedCarpeta} userId={userId}
-          onClose={() => { setShowModalPermisos(false); loadCarpetas(); }} />
+      {showModalPermisos && (carpetaPermisos ?? selectedCarpeta) && userId && (
+        <ModalPermisos
+          carpeta={(carpetaPermisos ?? selectedCarpeta)!}
+          userId={userId}
+          onClose={() => {
+            setShowModalPermisos(false);
+            setCarpetaPermisos(null);
+            loadCarpetas();
+          }}
+        />
       )}
 
       {error && (
