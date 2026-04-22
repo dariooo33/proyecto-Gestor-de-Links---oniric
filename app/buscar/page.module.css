@@ -200,3 +200,66 @@ select.filtroBtn {
   padding-right: 28px;
   cursor: pointer;
 }
+
+
+/* Lista scrolleable dentro del EtiquetasPicker (modales) */
+.etiquetaListBox {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  margin-top: 4px;
+  background: var(--bg, #fff);
+}
+
+.etiquetaListItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.12s;
+}
+.etiquetaListItem:hover {
+  background: var(--hover, #f3f4f6);
+}
+.etiquetaListItemOn {
+  background: var(--primary-light, #ede9fe);
+  font-weight: 500;
+}
+.etiquetaListItemOn:hover {
+  background: var(--primary-light-hover, #ddd6fe);
+}
+
+.etiquetaListCheck {
+  width: 14px;
+  font-size: 11px;
+  color: var(--color-primary, #6366f1);
+  flex-shrink: 0;
+}
+
+/* ── Dropdown de etiquetas en la página de búsqueda ─────────────────────── */
+
+.etiquetasDropdownPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  min-width: 220px;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  overflow: hidden;
+}
+
+.etiquetasDropdownList {
+  max-height: 200px;
+  overflow-y: auto;
+}

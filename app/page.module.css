@@ -972,3 +972,149 @@
 .menuCategoriaQuitar:hover {
   opacity: 1;
 }
+
+/* Badge de categoría en el header de la carpeta */
+.categoriaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(91, 127, 255, .12);
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  margin-left: 6px;
+}
+
+/* Selector de categoría inline dentro del dropdown */
+.menuCategoriaSelector {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface2);
+}
+
+.menuCategoriaSelect {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.menuCategoriaSelect:focus {
+  border-color: var(--accent);
+}
+
+.menuCategoriaQuitar {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 11px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  opacity: 0.8;
+  transition: opacity .15s;
+}
+.menuCategoriaQuitar:hover {
+  opacity: 1;
+}
+
+/* ─── Etiquetas ──────────────────────────────────────────────────────────── */
+
+/* Badge en header de carpeta */
+.etiquetaBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(78, 203, 141, .12);
+  color: var(--success);
+  border: 1px solid rgba(78, 203, 141, .25);
+  margin-left: 4px;
+}
+
+/* Badge pequeño junto al nombre del recurso */
+.etiquetaBadgeSmall {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(78, 203, 141, .1);
+  color: var(--success);
+  border: 1px solid rgba(78, 203, 141, .2);
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+/* Contador en el botón de etiquetas del menú */
+.menuEtiquetaCount {
+  margin-left: auto;
+  background: rgba(78, 203, 141, .15);
+  color: var(--success);
+  border-radius: 10px;
+  font-size: 11px;
+  padding: 1px 6px;
+}
+
+/* Wrap del selector de chips multi-etiqueta */
+.etiquetaSelectorWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+/* Chip individual de etiqueta (seleccionable) */
+.etiquetaChip {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.etiquetaChip:hover {
+  border-color: var(--success);
+  color: var(--text);
+}
+.etiquetaChipOn {
+  background: rgba(78, 203, 141, .15);
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 500;
+}
+.etiquetaChip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Mensaje cuando no hay etiquetas */
+.etiquetaEmpty {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Panel de etiquetas bajo un recurso */
+.recursoEtiquetaPanel {
+  padding: 8px 12px 10px 36px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border-soft);
+}

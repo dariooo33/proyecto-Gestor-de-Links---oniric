@@ -6,10 +6,97 @@ import { fmtDate } from "../helpers";
 import { supabase } from "../../lib/supabaseClient";
 import styles from "../page.module.css";
 
+interface Etiqueta { etiqueta_id: string; nombre: string; descripcion?: string; }
+
+// ── Selector de etiquetas con creación inline ──────────────────────────────
+function EtiquetasPicker({
+  etiquetas,
+  seleccionadas,
+  saving,
+  onToggle,
+  onCrear,
+}: {
+  etiquetas: Etiqueta[];
+  seleccionadas: string[];
+  saving: boolean;
+  onToggle: (id: string) => void;
+  onCrear: (etiqueta: Etiqueta) => void;
+}) {
+  const [creando, setCreando] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevaDesc, setNuevaDesc] = useState("");
+  const [savingNueva, setSavingNueva] = useState(false);
+
+  async function handleCrear() {
+    if (!nuevoNombre.trim()) return;
+    setSavingNueva(true);
+    const { data, error } = await supabase
+      .from("Etiquetas")
+      .insert({ nombre: nuevoNombre.trim(), descripcion: nuevaDesc.trim() })
+      .select()
+      .single();
+    if (!error && data) {
+      onCrear(data as Etiqueta);
+      setNuevoNombre("");
+      setNuevaDesc("");
+      setCreando(false);
+    }
+    setSavingNueva(false);
+  }
+
+  return (
+    <div>
+      <div className={styles.etiquetaSelectorWrap}>
+        {etiquetas.map((e) => (
+          <button key={e.etiqueta_id} type="button"
+            className={`${styles.etiquetaChip} ${seleccionadas.includes(e.etiqueta_id) ? styles.etiquetaChipOn : ""}`}
+            disabled={saving}
+            onClick={() => onToggle(e.etiqueta_id)}>
+            {e.nombre}
+          </button>
+        ))}
+        {etiquetas.length === 0 && !creando && (
+          <span className={styles.etiquetaEmpty}>No hay etiquetas aún</span>
+        )}
+      </div>
+
+      {!creando ? (
+        <button type="button" className={styles.menuCategoriaQuitar}
+          style={{ marginTop: 6, opacity: 1, color: "var(--accent)" }}
+          onClick={() => setCreando(true)}>
+          + Nueva etiqueta
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+          <input className={styles.menuCategoriaSelect} value={nuevoNombre} autoFocus
+            onChange={(e) => setNuevoNombre(e.target.value)}
+            placeholder="Nombre…" />
+          <input className={styles.menuCategoriaSelect} value={nuevaDesc}
+            onChange={(e) => setNuevaDesc(e.target.value)}
+            placeholder="Descripción (opcional)…" />
+          <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+            <button type="button" className={styles.menuCategoriaQuitar}
+              onClick={() => { setCreando(false); setNuevoNombre(""); setNuevaDesc(""); }}>
+              Cancelar
+            </button>
+            <button type="button"
+              className={styles.menuCategoriaQuitar}
+              style={{ color: "var(--accent)", opacity: nuevoNombre.trim() ? 1 : 0.4 }}
+              disabled={!nuevoNombre.trim() || savingNueva}
+              onClick={handleCrear}>
+              {savingNueva ? "Creando…" : "✓ Crear"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CenterPanel({
   carpeta, subCarpetas, recursos, loading, userId, nivelAcceso,
   onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta,
-  onOpenPermisos, onLeaveShared, onTogglePublica, onSetCategoria,
+  onOpenPermisos, onLeaveShared, onTogglePublica, onSetCategoria, onSetEtiquetas,
 }: {
   carpeta: Carpeta | null;
   subCarpetas: Carpeta[];
@@ -25,69 +112,92 @@ export function CenterPanel({
   onLeaveShared: (carpetaId: string) => void;
   onTogglePublica: (carpetaId: string, publica: boolean) => Promise<void>;
   onSetCategoria: (carpetaId: string, categoriaId: string | null) => Promise<void>;
+  onSetEtiquetas: (carpetaId: string | null, recursoId: string | null, etiquetaIds: string[]) => Promise<void>;
 }) {
   const [selectedRecurso, setSelectedRecurso] = useState<Recurso | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Filtros
+  // Filtros locales
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriasFiltro, setCategoriasFiltro] = useState<Set<string>>(new Set());
   const [busquedaLocal, setBusquedaLocal] = useState("");
 
-  // Categoría actual de la carpeta seleccionada y todas las categorías disponibles
+  // Categoría actual
   const [todasCategorias, setTodasCategorias] = useState<Categoria[]>([]);
   const [categoriaActual, setCategoriaActual] = useState<string | null>(null);
   const [showCategoriaSelector, setShowCategoriaSelector] = useState(false);
   const [savingCategoria, setSavingCategoria] = useState(false);
 
-  // Cargar todas las categorías disponibles una sola vez
+  // Etiquetas — catálogo global compartido entre carpeta y recursos
+  const [todasEtiquetas, setTodasEtiquetas] = useState<Etiqueta[]>([]);
+  const [etiquetasCarpeta, setEtiquetasCarpeta] = useState<string[]>([]);
+  const [showEtiquetaSelector, setShowEtiquetaSelector] = useState(false);
+  const [savingEtiquetas, setSavingEtiquetas] = useState(false);
+  const [etiquetasRecurso, setEtiquetasRecurso] = useState<Record<string, string[]>>({});
+  const [recursoEtiquetaOpen, setRecursoEtiquetaOpen] = useState<string | null>(null);
+  const [savingRecursoEtiqueta, setSavingRecursoEtiqueta] = useState(false);
+
+  // Cargar catálogos globales una sola vez
   useEffect(() => {
+    supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion").order("nombre")
+      .then(({ data }) => setTodasEtiquetas((data as Etiqueta[]) ?? []));
     supabase.from("Categorias").select("categoria_id, nombre").order("nombre")
       .then(({ data }) => setTodasCategorias((data as Categoria[]) ?? []));
   }, []);
 
-  // Cargar categoría actual de la carpeta seleccionada
+  // Recargar datos al cambiar de carpeta
   useEffect(() => {
-    if (!carpeta) { setCategoriaActual(null); return; }
-    supabase
-      .from("Carpetas_Recrusos_Categoria")
-      .select("categoria_id")
-      .eq("carpeta_id", carpeta.carpeta_id)
-      .not("categoria_id", "is", null)
-      .maybeSingle()
-      .then(({ data }) => {
-        setCategoriaActual(data?.categoria_id ?? null);
-      });
+    if (!carpeta) { setCategoriaActual(null); setEtiquetasCarpeta([]); return; }
+    supabase.from("Carpetas_Recrusos_Categoria")
+      .select("categoria_id").eq("carpeta_id", carpeta.carpeta_id).maybeSingle()
+      .then(({ data }) => setCategoriaActual(data?.categoria_id ?? null));
+    supabase.from("Carpetas_Recrusos_Etiquetas")
+      .select("etiqueta_id").eq("carpeta_id", carpeta.carpeta_id)
+      .then(({ data }) => setEtiquetasCarpeta((data ?? []).map((r: any) => r.etiqueta_id)));
   }, [carpeta?.carpeta_id]);
 
-  // Cargar categorías de las subcarpetas actuales (para filtros)
+  // Etiquetas de los recursos visibles
+  useEffect(() => {
+    if (recursos.length === 0) { setEtiquetasRecurso({}); return; }
+    const ids = recursos.map((r) => r.recurso_id);
+    supabase.from("Carpetas_Recrusos_Etiquetas")
+      .select("recurso_id, etiqueta_id").in("recurso_id", ids)
+      .then(({ data }) => {
+        const map: Record<string, string[]> = {};
+        (data ?? []).forEach((r: any) => {
+          if (!map[r.recurso_id]) map[r.recurso_id] = [];
+          map[r.recurso_id].push(r.etiqueta_id);
+        });
+        setEtiquetasRecurso(map);
+      });
+  }, [recursos]);
+
+  // Categorías de subcarpetas para chips de filtro
   useEffect(() => {
     if (!carpeta) return;
     const ids = subCarpetas.map((c) => c.carpeta_id);
     if (ids.length === 0) { setCategorias([]); return; }
-    supabase
-      .from("Carpetas_Recrusos_Categoria")
-      .select("categoria_id, Categorias(categoria_id, nombre)")
-      .in("carpeta_id", ids)
+    supabase.from("Carpetas_Recrusos_Categoria")
+      .select("categoria_id, Categorias(categoria_id, nombre)").in("carpeta_id", ids)
       .then(({ data }) => {
         const seen = new Set<string>();
         const cats: Categoria[] = [];
         (data ?? []).forEach((r: any) => {
           const c = r.Categorias;
-          if (c && !seen.has(c.categoria_id)) {
-            seen.add(c.categoria_id);
-            cats.push(c);
-          }
+          if (c && !seen.has(c.categoria_id)) { seen.add(c.categoria_id); cats.push(c); }
         });
         setCategorias(cats);
       });
   }, [carpeta?.carpeta_id, subCarpetas]);
 
+  // Reset al cambiar de carpeta
   useEffect(() => {
     setSelectedRecurso(null);
     setMenuOpen(false);
     setShowCategoriaSelector(false);
+    setShowEtiquetaSelector(false);
+    setRecursoEtiquetaOpen(null);
     setCategoriasFiltro(new Set());
     setBusquedaLocal("");
   }, [carpeta?.carpeta_id]);
@@ -97,6 +207,7 @@ export function CenterPanel({
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
         setShowCategoriaSelector(false);
+        setShowEtiquetaSelector(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -106,16 +217,12 @@ export function CenterPanel({
   const canEdit = nivelAcceso === "owner" || nivelAcceso === "edicion";
   const isOwner = nivelAcceso === "owner";
 
-  // Mapa carpeta → categorías para el filtro
+  // Mapa carpeta → categorías para filtro local
   const [carpetaCategorias, setCarpetaCategorias] = useState<Record<string, string[]>>({});
-
   useEffect(() => {
     const ids = subCarpetas.map((c) => c.carpeta_id);
     if (ids.length === 0) { setCarpetaCategorias({}); return; }
-    supabase
-      .from("Carpetas_Recrusos_Categoria")
-      .select("carpeta_id, categoria_id")
-      .in("carpeta_id", ids)
+    supabase.from("Carpetas_Recrusos_Categoria").select("carpeta_id, categoria_id").in("carpeta_id", ids)
       .then(({ data }) => {
         const map: Record<string, string[]> = {};
         (data ?? []).forEach((r: any) => {
@@ -155,6 +262,26 @@ export function CenterPanel({
     setMenuOpen(false);
   }
 
+  async function handleGuardarEtiquetasCarpeta(ids: string[]) {
+    if (!carpeta) return;
+    setSavingEtiquetas(true);
+    await onSetEtiquetas(carpeta.carpeta_id, null, ids);
+    setEtiquetasCarpeta(ids);
+    setSavingEtiquetas(false);
+  }
+
+  async function handleGuardarEtiquetasRecurso(recursoId: string, ids: string[]) {
+    setSavingRecursoEtiqueta(true);
+    await onSetEtiquetas(null, recursoId, ids);
+    setEtiquetasRecurso((prev) => ({ ...prev, [recursoId]: ids }));
+    setSavingRecursoEtiqueta(false);
+  }
+
+  // Cuando se crea una etiqueta nueva desde cualquier picker, añadirla al catálogo global
+  function handleNuevaEtiqueta(e: Etiqueta) {
+    setTodasEtiquetas((prev) => [...prev, e].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+  }
+
   if (!carpeta) {
     return (
       <div className={styles.emptyState}>
@@ -173,6 +300,9 @@ export function CenterPanel({
   }
 
   const categoriaActualNombre = todasCategorias.find(c => c.categoria_id === categoriaActual)?.nombre;
+  const etiquetasCarpetaObj = etiquetasCarpeta
+    .map((id) => todasEtiquetas.find((e) => e.etiqueta_id === id))
+    .filter(Boolean) as Etiqueta[];
 
   return (
     <div>
@@ -188,6 +318,9 @@ export function CenterPanel({
             {categoriaActualNombre && (
               <span className={styles.categoriaBadge}>🏷️ {categoriaActualNombre}</span>
             )}
+            {etiquetasCarpetaObj.map((e) => (
+              <span key={e.etiqueta_id} className={styles.etiquetaBadge}>{e.nombre}</span>
+            ))}
           </div>
           <div className={styles.folderHeaderMeta}>
             {subCarpetas.length} subcarpeta{subCarpetas.length !== 1 ? "s" : ""}
@@ -195,10 +328,13 @@ export function CenterPanel({
             {" · "}Creada {fmtDate(carpeta.created_at)}
           </div>
         </div>
+
         <div className={styles.folderActions}>
           {canEdit && <button className={styles.btnPrimary} onClick={onNewRecurso}>+ Recurso</button>}
           <div className={styles.menuWrapper} ref={menuRef}>
-            <button className={styles.btnMenu} onClick={() => { setMenuOpen((v) => !v); setShowCategoriaSelector(false); }} title="Opciones">⋯</button>
+            <button className={styles.btnMenu}
+              onClick={() => { setMenuOpen((v) => !v); setShowCategoriaSelector(false); setShowEtiquetaSelector(false); }}
+              title="Opciones">⋯</button>
             {menuOpen && (
               <div className={styles.menuDropdown}>
                 {isOwner && (
@@ -206,43 +342,62 @@ export function CenterPanel({
                     <button className={styles.menuItem} onClick={() => { setMenuOpen(false); onOpenPermisos(); }}>
                       <span>🔐</span> Permisos
                     </button>
-                    <button className={styles.menuItem} onClick={() => { setMenuOpen(false); onTogglePublica(carpeta.carpeta_id, !carpeta.publica); }}>
+                    <button className={styles.menuItem}
+                      onClick={() => { setMenuOpen(false); onTogglePublica(carpeta.carpeta_id, !carpeta.publica); }}>
                       <span>{carpeta.publica ? "🔒" : "🌐"}</span>
                       {carpeta.publica ? "Hacer privada" : "Hacer pública"}
                     </button>
 
-                    {/* ── Categoría ── */}
-                    <button
-                      className={styles.menuItem}
-                      onClick={() => setShowCategoriaSelector((v) => !v)}
-                    >
-                      <span>🏷️</span>
-                      {categoriaActual ? "Cambiar categoría" : "Asignar categoría"}
+                    {/* Categoría */}
+                    <button className={styles.menuItem}
+                      onClick={() => { setShowEtiquetaSelector(false); setShowCategoriaSelector((v) => !v); }}>
+                      <span>🏷️</span>{categoriaActual ? "Cambiar categoría" : "Asignar categoría"}
                     </button>
-
                     {showCategoriaSelector && (
                       <div className={styles.menuCategoriaSelector}>
-                        <select
-                          className={styles.menuCategoriaSelect}
+                        <select className={styles.menuCategoriaSelect}
                           value={categoriaActual ?? ""}
                           onChange={(e) => handleGuardarCategoria(e.target.value || null)}
-                          disabled={savingCategoria}
-                          autoFocus
-                        >
+                          disabled={savingCategoria} autoFocus>
                           <option value="">Sin categoría</option>
                           {todasCategorias.map((c) => (
                             <option key={c.categoria_id} value={c.categoria_id}>{c.nombre}</option>
                           ))}
                         </select>
                         {categoriaActual && (
-                          <button
-                            className={styles.menuCategoriaQuitar}
-                            disabled={savingCategoria}
-                            onClick={() => handleGuardarCategoria(null)}
-                          >
+                          <button className={styles.menuCategoriaQuitar}
+                            disabled={savingCategoria} onClick={() => handleGuardarCategoria(null)}>
                             × Quitar categoría
                           </button>
                         )}
+                      </div>
+                    )}
+
+                    {/* Etiquetas carpeta */}
+                    <button className={styles.menuItem}
+                      onClick={() => { setShowCategoriaSelector(false); setShowEtiquetaSelector((v) => !v); }}>
+                      <span>🔖</span> Etiquetas
+                      {etiquetasCarpeta.length > 0 && (
+                        <span className={styles.menuEtiquetaCount}>{etiquetasCarpeta.length}</span>
+                      )}
+                    </button>
+                    {showEtiquetaSelector && (
+                      <div className={styles.menuCategoriaSelector}>
+                        <EtiquetasPicker
+                          etiquetas={todasEtiquetas}
+                          seleccionadas={etiquetasCarpeta}
+                          saving={savingEtiquetas}
+                          onToggle={(id) => {
+                            const next = etiquetasCarpeta.includes(id)
+                              ? etiquetasCarpeta.filter((x) => x !== id)
+                              : [...etiquetasCarpeta, id];
+                            handleGuardarEtiquetasCarpeta(next);
+                          }}
+                          onCrear={(e) => {
+                            handleNuevaEtiqueta(e);
+                            handleGuardarEtiquetasCarpeta([...etiquetasCarpeta, e.etiqueta_id]);
+                          }}
+                        />
                       </div>
                     )}
 
@@ -267,27 +422,20 @@ export function CenterPanel({
 
       {/* Barra de filtros */}
       <div className={styles.filterBar}>
-        <input
-          className={styles.filterSearch}
-          value={busquedaLocal}
+        <input className={styles.filterSearch} value={busquedaLocal}
           onChange={(e) => setBusquedaLocal(e.target.value)}
-          placeholder="Buscar en esta carpeta…"
-        />
+          placeholder="Buscar en esta carpeta…" />
         {categorias.length > 0 && (
           <div className={styles.filterCategorias}>
             {categorias.map((cat) => (
-              <button
-                key={cat.categoria_id}
+              <button key={cat.categoria_id}
                 className={`${styles.filterChip} ${categoriasFiltro.has(cat.categoria_id) ? styles.filterChipActive : ""}`}
-                onClick={() => toggleCategoria(cat.categoria_id)}
-              >
+                onClick={() => toggleCategoria(cat.categoria_id)}>
                 {cat.nombre}
               </button>
             ))}
             {categoriasFiltro.size > 0 && (
-              <button className={styles.filterClear} onClick={() => setCategoriasFiltro(new Set())}>
-                × Limpiar
-              </button>
+              <button className={styles.filterClear} onClick={() => setCategoriasFiltro(new Set())}>× Limpiar</button>
             )}
           </div>
         )}
@@ -314,20 +462,56 @@ export function CenterPanel({
         <>
           <div className={styles.sectionTitle}>Recursos</div>
           <div className={styles.resourceList}>
-            {recursosFiltrados.map((r) => (
-              <div key={r.recurso_id} className={styles.resourceRow}
-                onClick={() => setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r)}>
-                <span className={styles.resourceIcon}>📄</span>
-                <span className={styles.resourceName}>{r.nombre}</span>
-                <span className={styles.resourceDate}>{fmtDate(r.created_at)}</span>
-                {canEdit && (
-                  <span className={styles.resourceDelete}>
-                    <button className={styles.btnIcon}
-                      onClick={(e) => { e.stopPropagation(); onDeleteRecurso(r.recurso_id); }}>🗑</button>
-                  </span>
-                )}
-              </div>
-            ))}
+            {recursosFiltrados.map((r) => {
+              const etiIds = etiquetasRecurso[r.recurso_id] ?? [];
+              const etiObjs = etiIds.map((id) => todasEtiquetas.find((e) => e.etiqueta_id === id)).filter(Boolean) as Etiqueta[];
+              const etiquetaOpen = recursoEtiquetaOpen === r.recurso_id;
+
+              return (
+                <div key={r.recurso_id}>
+                  <div className={styles.resourceRow}
+                    onClick={() => setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r)}>
+                    <span className={styles.resourceIcon}>📄</span>
+                    <span className={styles.resourceName}>{r.nombre}</span>
+                    {etiObjs.map((e) => (
+                      <span key={e.etiqueta_id} className={styles.etiquetaBadgeSmall}>{e.nombre}</span>
+                    ))}
+                    <span className={styles.resourceDate}>{fmtDate(r.created_at)}</span>
+                    {canEdit && (
+                      <span className={styles.resourceDelete} style={{ display: "flex", gap: 4 }}>
+                        <button className={styles.btnIcon} title="Etiquetas"
+                          onClick={(e) => { e.stopPropagation(); setRecursoEtiquetaOpen(etiquetaOpen ? null : r.recurso_id); }}>
+                          🔖
+                        </button>
+                        <button className={styles.btnIcon}
+                          onClick={(e) => { e.stopPropagation(); onDeleteRecurso(r.recurso_id); }}>🗑</button>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Panel de etiquetas del recurso */}
+                  {etiquetaOpen && (
+                    <div className={styles.recursoEtiquetaPanel}>
+                      <EtiquetasPicker
+                        etiquetas={todasEtiquetas}
+                        seleccionadas={etiIds}
+                        saving={savingRecursoEtiqueta}
+                        onToggle={(id) => {
+                          const next = etiIds.includes(id)
+                            ? etiIds.filter((x) => x !== id)
+                            : [...etiIds, id];
+                          handleGuardarEtiquetasRecurso(r.recurso_id, next);
+                        }}
+                        onCrear={(e) => {
+                          handleNuevaEtiqueta(e);
+                          handleGuardarEtiquetasRecurso(r.recurso_id, [...etiIds, e.etiqueta_id]);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

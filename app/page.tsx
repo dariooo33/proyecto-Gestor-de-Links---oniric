@@ -87,7 +87,6 @@ export default function Home() {
 
   useEffect(() => { if (userId) loadCarpetas(); }, [userId, loadCarpetas]);
 
-  // Seleccionar carpeta desde parámetro ?highlight=
   useEffect(() => {
     if (!highlightId || carpetas.length === 0) return;
     const carpeta = carpetas.find((c) => c.carpeta_id === highlightId);
@@ -95,9 +94,7 @@ export default function Home() {
     if (!carpeta) {
       supabase.from("Carpetas").select("carpeta_id, user_id").eq("carpeta_id", highlightId).single()
         .then(({ data }) => {
-          if (data && data.user_id !== userId) {
-            router.replace(`/usuario/${data.user_id}`);
-          }
+          if (data && data.user_id !== userId) router.replace(`/usuario/${data.user_id}`);
         });
       return;
     }
@@ -141,7 +138,12 @@ export default function Home() {
   }
 
   // ── CRUD Carpetas ────────────────────────────────────────────────────────
-  async function handleCreateCarpeta(nombre: string, parentId: string | null, categoriaId: string | null) {
+  async function handleCreateCarpeta(
+    nombre: string,
+    parentId: string | null,
+    categoriaId: string | null,
+    etiquetaIds: string[]
+  ) {
     if (!userId) return;
     const duplicado = carpetas.some(
       (c) => c.nombre.toLowerCase() === nombre.toLowerCase() && c.id_padre === parentId
@@ -156,7 +158,6 @@ export default function Home() {
 
     if (error || !nueva) { setError(error?.message ?? "Error al crear carpeta"); return; }
 
-    // Si la carpeta padre pertenece a otro usuario, darle acceso "edicion" a su dueño
     if (parentId) {
       const padre = carpetas.find((c) => c.carpeta_id === parentId);
       if (padre && padre.user_id !== userId) {
@@ -169,13 +170,22 @@ export default function Home() {
       }
     }
 
-    // Insertar categoría si se seleccionó una
     if (categoriaId) {
       const { error: catError } = await supabase.from("Carpetas_Recrusos_Categoria").insert({
         carpeta_id: nueva.carpeta_id,
         categoria_id: categoriaId,
       });
       if (catError) setError(`Carpeta creada pero error al asignar categoría: ${catError.message}`);
+    }
+
+    // Insertar etiquetas si se seleccionaron
+    if (etiquetaIds.length > 0) {
+      const rows = etiquetaIds.map((eid) => ({
+        carpeta_id: nueva.carpeta_id,
+        etiqueta_id: eid,
+      }));
+      const { error: etqError } = await supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows);
+      if (etqError) setError(`Carpeta creada pero error al asignar etiquetas: ${etqError.message}`);
     }
 
     await loadCarpetas();
@@ -200,15 +210,9 @@ export default function Home() {
     await loadCarpetas();
   }
 
-  // ── Gestión de categoría de carpeta ─────────────────────────────────────
+  // ── Gestión de categoría ─────────────────────────────────────────────────
   async function handleSetCategoria(carpetaId: string, categoriaId: string | null) {
-    // Eliminar categoría existente
-    await supabase.from("Carpetas_Recrusos_Categoria")
-      .delete()
-      .eq("carpeta_id", carpetaId)
-      
-
-    // Insertar nueva si se seleccionó una
+    await supabase.from("Carpetas_Recrusos_Categoria").delete().eq("carpeta_id", carpetaId);
     if (categoriaId) {
       const { error } = await supabase.from("Carpetas_Recrusos_Categoria").insert({
         carpeta_id: carpetaId,
@@ -216,17 +220,48 @@ export default function Home() {
       });
       if (error) { setError(error.message); return; }
     }
-
     await loadCarpetas();
   }
 
+  // ── Gestión de etiquetas ─────────────────────────────────────────────────
+  async function handleSetEtiquetas(
+    carpetaId: string | null,
+    recursoId: string | null,
+    etiquetaIds: string[]
+  ) {
+    // Borrar todas las etiquetas actuales de la entidad
+    const deleteQuery = supabase.from("Carpetas_Recrusos_Etiquetas").delete();
+    if (carpetaId) deleteQuery.eq("carpeta_id", carpetaId);
+    else if (recursoId) deleteQuery.eq("recurso_id", recursoId);
+    await deleteQuery;
+
+    // Insertar las nuevas
+    if (etiquetaIds.length > 0) {
+      const rows = etiquetaIds.map((eid) => ({
+        ...(carpetaId ? { carpeta_id: carpetaId } : {}),
+        ...(recursoId ? { recurso_id: recursoId } : {}),
+        etiqueta_id: eid,
+      }));
+      const { error } = await supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows);
+      if (error) { setError(error.message); return; }
+    }
+  }
+
   // ── CRUD Recursos ────────────────────────────────────────────────────────
-  async function handleCreateRecurso(nombre: string, contenido: string) {
+  async function handleCreateRecurso(nombre: string, contenido: string, etiquetaIds: string[]) {
     if (!selectedId || !userId) return;
-    const { error } = await supabase.from("Recursos").insert({
-      user_id: userId, carpeta_id: selectedId, nombre, contenido,
-    });
-    if (error) { setError(error.message); return; }
+    const { data: nuevo, error } = await supabase.from("Recursos")
+      .insert({ user_id: userId, carpeta_id: selectedId, nombre, contenido })
+      .select("recurso_id")
+      .single();
+    if (error || !nuevo) { setError(error?.message ?? "Error al crear recurso"); return; }
+
+    if (etiquetaIds.length > 0) {
+      const rows = etiquetaIds.map((eid) => ({ recurso_id: nuevo.recurso_id, etiqueta_id: eid }));
+      const { error: etqError } = await supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows);
+      if (etqError) setError(`Recurso creado pero error al asignar etiquetas: ${etqError.message}`);
+    }
+
     await loadRecursos(selectedId);
     setShowModalRecurso(false);
   }
@@ -242,9 +277,7 @@ export default function Home() {
     if (!userId) return;
     if (!confirm("¿Quieres eliminar tu acceso a esta carpeta compartida?")) return;
     const { error } = await supabase.from("Permisos")
-      .delete()
-      .eq("carpeta_id", carpetaId)
-      .eq("user_id", userId);
+      .delete().eq("carpeta_id", carpetaId).eq("user_id", userId);
     if (error) { setError(error.message); return; }
     setSelectedId(null);
     await loadCarpetas();
@@ -302,6 +335,7 @@ export default function Home() {
             onLeaveShared={handleLeaveShared}
             onTogglePublica={handleTogglePublica}
             onSetCategoria={handleSetCategoria}
+            onSetEtiquetas={handleSetEtiquetas}
           />
         </div>
       </main>
