@@ -1,5 +1,5 @@
 /* ─── Google Font ─────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ─── Reset ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
@@ -8,26 +8,31 @@
   padding: 0;
 }
 
-/* ─── CSS Variables ───────────────────────────────────────────────────────── */
+/* ─── CSS Variables — Oniric Academy Palette ──────────────────────────────── */
 :root {
-  --bg:          #0c0d11;
-  --surface:     #13141b;
-  --surface2:    #1a1c26;
-  --border:      #21232f;
-  --border-soft: #191b25;
-  --accent:      #5b7fff;
-  --accent-dim:  #2a3a6e;
-  --accent-glow: rgba(91, 127, 255, .18);
-  --text:        #dde0ef;
-  --text-muted:  #636680;
-  --text-dim:    #8f93ab;
-  --danger:      #e05c6a;
+  --bg:          #080808;
+  --surface:     #0f0f0f;
+  --surface2:    #171717;
+  --border:      #222222;
+  --border-soft: #1a1a1a;
+  --accent:      #f5a623;        /* orange-yellow Oniric */
+  --accent-alt:  #e8173a;        /* pink-red Oniric */
+  --accent-blue: #1e3fe8;        /* blue Oniric */
+  --accent-dim:  rgba(245,166,35,.12);
+  --accent-glow: rgba(245,166,35,.22);
+  --text:        #e8e6e0;
+  --text-muted:  #555550;
+  --text-dim:    #888880;
+  --danger:      #e8173a;
   --success:     #4ecb8d;
-  --font-body:   'DM Sans', sans-serif;
-  --font-mono:   'DM Mono', monospace;
-  --radius:      9px;
-  --radius-lg:   13px;
-  --transition:  .15s ease;
+  --font-body:   'Exo 2', sans-serif;
+  --font-mono:   'JetBrains Mono', monospace;
+  --radius:      6px;
+  --radius-lg:   10px;
+  --transition:  .18s ease;
+
+  /* Oniric gradient stripe */
+  --stripe: linear-gradient(90deg, #1e3fe8 0%, #e8173a 40%, #f5a623 70%, #f5d623 100%);
 }
 
 /* ─── Base ────────────────────────────────────────────────────────────────── */
@@ -40,3 +45,12 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
+
+/* ─── Oniric scrollbar ────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ─── Selection ───────────────────────────────────────────────────────────── */
+::selection { background: var(--accent-glow); color: var(--accent); }

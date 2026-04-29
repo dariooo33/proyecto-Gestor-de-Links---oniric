@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { TreeNode, Categoria } from "../types";
 import { flatFolders } from "../helpers";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "../page.module.css";
 
 interface Etiqueta { etiqueta_id: string; nombre: string; descripcion?: string; }

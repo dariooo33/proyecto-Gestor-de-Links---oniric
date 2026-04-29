@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Carpeta, Permiso, UsuarioBusqueda } from "../types";
 import { getAllDescendantIds } from "../helpers";
 import styles from "../page.module.css";

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Carpeta, Recurso, NivelAcceso } from "./types";
 import { buildTree, getAllDescendantIds } from "./helpers";
 import { SidebarTree } from "./components/SidebarTree";
@@ -204,6 +204,12 @@ if (etiquetaIds.length > 0) {
     setConfirm({
       message: `¿Eliminar la carpeta "${nombre}" y todo su contenido?`,
       onConfirm: async () => {
+        // Borrar etiquetas y categorías por carpeta_id directamente
+        await supabase.from("Carpetas_Recrusos_Etiquetas").delete().eq("carpeta_id", carpetaId);
+        await supabase.from("Carpetas_Recrusos_Categoria").delete().eq("carpeta_id", carpetaId);
+        // Borrar los recursos de la carpeta
+        await supabase.from("Recursos").delete().eq("carpeta_id", carpetaId);
+
         const { error } = await supabase.from("Carpetas").delete().eq("carpeta_id", carpetaId);
         if (error) { setError(error.message); return; }
         if (selectedId === carpetaId) setSelectedId(null);
@@ -339,7 +345,7 @@ if (etiquetaIds.length > 0) {
         <div className={styles.topBar}>
           <div className={styles.logo}>
             <span className={styles.logoIcon}>🗂</span>
-            FileManager
+            GESTOR DE LINKS - ONIRIC VIEW
           </div>
           <nav className={styles.topNav}>
             <button className={styles.btnPrimary} onClick={() => {

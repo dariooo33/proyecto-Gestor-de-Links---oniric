@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { Carpeta, Recurso } from "../../types";
 import { fmtDate } from "../../helpers";
 import styles from "./page.module.css";

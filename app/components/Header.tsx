@@ -173,9 +173,8 @@ export default function Header() {
         <ul>
           <div className={styles.izquierda}>
             <div className={styles.logo}>
-              <img src="/logo.png" alt="logo" />
+              <a href="/"><img src="/logo.png" alt="logo" /></a>
             </div>
-            <h1>GESTOR DE LINKS - ONIRIC VIEW</h1>
           </div>
 
           <div className={styles.centro} ref={searchRef}>

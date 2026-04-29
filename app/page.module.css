@@ -15,12 +15,13 @@
 /* ─── Top Bar ─────────────────────────────────────────────────────────────── */
 .topBar {
   grid-column: 1 / -1;
-  background: var(--surface);
+  background: #080808;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 5px 20px;
   gap: 10px;
+  position: relative;
 }
 
 .logo {
@@ -53,7 +54,7 @@
 /* ─── Buttons ─────────────────────────────────────────────────────────────── */
 .btnPrimary {
   background: var(--accent);
-  color: #fff;
+  color: #080808;
   border: none;
   border-radius: var(--radius);
   padding: 6px 14px;
@@ -67,7 +68,7 @@
   gap: 6px;
 }
 .btnPrimary:hover {
-  background: #4a6bee;
+  background: #f7b93e;
   box-shadow: 0 0 16px var(--accent-glow);
 }
 .btnPrimary:disabled {
@@ -340,7 +341,7 @@
 .folderCard:hover {
   border-color: var(--accent);
   background: var(--surface2);
-  box-shadow: 0 4px 20px var(--accent-glow);
+  box-shadow: 0 4px 20px rgba(245,166,35,.15);
 }
 .folderCard:hover::before {
   opacity: 1;
