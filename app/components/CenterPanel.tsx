@@ -8,6 +8,11 @@ import styles from "../page.module.css";
 
 interface Etiqueta { etiqueta_id: string; nombre: string; descripcion?: string; }
 
+// Tipos intermedios para resultados de join de Supabase
+interface EtiquetaRelacion { etiqueta_id: string; }
+interface CategoriaRelacion { carpeta_id: string; categoria_id: string; }
+interface CategoriaJoin { Categorias: { categoria_id: string; nombre: string } | null; }
+
 // ── Selector de etiquetas con creación inline ──────────────────────────────
 function EtiquetasPicker({
   etiquetas,
@@ -67,14 +72,14 @@ function EtiquetasPicker({
           + Nueva etiqueta
         </button>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+        <div className={styles.etiquetaCrearBox}>
           <input className={styles.menuCategoriaSelect} value={nuevoNombre} autoFocus
             onChange={(e) => setNuevoNombre(e.target.value)}
             placeholder="Nombre…" />
           <input className={styles.menuCategoriaSelect} value={nuevaDesc}
             onChange={(e) => setNuevaDesc(e.target.value)}
             placeholder="Descripción (opcional)…" />
-          <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+          <div className={styles.etiquetaCrearActions}>
             <button type="button" className={styles.menuCategoriaQuitar}
               onClick={() => { setCreando(false); setNuevoNombre(""); setNuevaDesc(""); }}>
               Cancelar
@@ -123,38 +128,53 @@ export function CenterPanel({
   const [categoriasFiltro, setCategoriasFiltro] = useState<Set<string>>(new Set());
   const [busquedaLocal, setBusquedaLocal] = useState("");
 
-  // Categoría actual
+  // Catálogos globales (cargados una sola vez)
   const [todasCategorias, setTodasCategorias] = useState<Categoria[]>([]);
+  const [todasEtiquetas, setTodasEtiquetas] = useState<Etiqueta[]>([]);
+
+  // Estado de la carpeta actual
   const [categoriaActual, setCategoriaActual] = useState<string | null>(null);
   const [showCategoriaSelector, setShowCategoriaSelector] = useState(false);
   const [savingCategoria, setSavingCategoria] = useState(false);
-
-  // Etiquetas — catálogo global compartido entre carpeta y recursos
-  const [todasEtiquetas, setTodasEtiquetas] = useState<Etiqueta[]>([]);
   const [etiquetasCarpeta, setEtiquetasCarpeta] = useState<string[]>([]);
   const [showEtiquetaSelector, setShowEtiquetaSelector] = useState(false);
   const [savingEtiquetas, setSavingEtiquetas] = useState(false);
+
+  // Etiquetas de recursos
   const [etiquetasRecurso, setEtiquetasRecurso] = useState<Record<string, string[]>>({});
   const [recursoEtiquetaOpen, setRecursoEtiquetaOpen] = useState<string | null>(null);
   const [savingRecursoEtiqueta, setSavingRecursoEtiqueta] = useState(false);
 
+  // Mapa carpeta → categorías para filtro
+  const [carpetaCategorias, setCarpetaCategorias] = useState<Record<string, string[]>>({});
+
   // Cargar catálogos globales una sola vez
   useEffect(() => {
-    supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion").order("nombre")
-      .then(({ data }) => setTodasEtiquetas((data as Etiqueta[]) ?? []));
-    supabase.from("Categorias").select("categoria_id, nombre").order("nombre")
-      .then(({ data }) => setTodasCategorias((data as Categoria[]) ?? []));
+    Promise.all([
+      supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion").order("nombre"),
+      supabase.from("Categorias").select("categoria_id, nombre").order("nombre"),
+    ]).then(([{ data: etqs }, { data: cats }]) => {
+      setTodasEtiquetas((etqs as Etiqueta[]) ?? []);
+      setTodasCategorias((cats as Categoria[]) ?? []);
+    });
   }, []);
 
-  // Recargar datos al cambiar de carpeta
+  // Recargar datos al cambiar de carpeta (agrupado en Promise.all)
   useEffect(() => {
-    if (!carpeta) { setCategoriaActual(null); setEtiquetasCarpeta([]); return; }
-    supabase.from("Carpetas_Recrusos_Categoria")
-      .select("categoria_id").eq("carpeta_id", carpeta.carpeta_id).maybeSingle()
-      .then(({ data }) => setCategoriaActual(data?.categoria_id ?? null));
-    supabase.from("Carpetas_Recrusos_Etiquetas")
-      .select("etiqueta_id").eq("carpeta_id", carpeta.carpeta_id)
-      .then(({ data }) => setEtiquetasCarpeta((data ?? []).map((r: any) => r.etiqueta_id)));
+    if (!carpeta) {
+      setCategoriaActual(null);
+      setEtiquetasCarpeta([]);
+      return;
+    }
+    Promise.all([
+      supabase.from("Carpetas_Recrusos_Categoria")
+        .select("categoria_id").eq("carpeta_id", carpeta.carpeta_id).maybeSingle(),
+      supabase.from("Carpetas_Recrusos_Etiquetas")
+        .select("etiqueta_id").eq("carpeta_id", carpeta.carpeta_id),
+    ]).then(([{ data: catData }, { data: etqData }]) => {
+      setCategoriaActual(catData?.categoria_id ?? null);
+      setEtiquetasCarpeta((etqData ?? []).map((r: EtiquetaRelacion) => r.etiqueta_id));
+    });
   }, [carpeta?.carpeta_id]);
 
   // Etiquetas de los recursos visibles
@@ -165,7 +185,7 @@ export function CenterPanel({
       .select("recurso_id, etiqueta_id").in("recurso_id", ids)
       .then(({ data }) => {
         const map: Record<string, string[]> = {};
-        (data ?? []).forEach((r: any) => {
+        (data ?? []).forEach((r: { recurso_id: string; etiqueta_id: string }) => {
           if (!map[r.recurso_id]) map[r.recurso_id] = [];
           map[r.recurso_id].push(r.etiqueta_id);
         });
@@ -173,22 +193,37 @@ export function CenterPanel({
       });
   }, [recursos]);
 
-  // Categorías de subcarpetas para chips de filtro
+  // Categorías de subcarpetas + mapa para filtro (agrupados en Promise.all)
   useEffect(() => {
-    if (!carpeta) return;
     const ids = subCarpetas.map((c) => c.carpeta_id);
-    if (ids.length === 0) { setCategorias([]); return; }
-    supabase.from("Carpetas_Recrusos_Categoria")
-      .select("categoria_id, Categorias(categoria_id, nombre)").in("carpeta_id", ids)
-      .then(({ data }) => {
-        const seen = new Set<string>();
-        const cats: Categoria[] = [];
-        (data ?? []).forEach((r: any) => {
-          const c = r.Categorias;
-          if (c && !seen.has(c.categoria_id)) { seen.add(c.categoria_id); cats.push(c); }
-        });
-        setCategorias(cats);
+    if (ids.length === 0) {
+      setCategorias([]);
+      setCarpetaCategorias({});
+      return;
+    }
+    Promise.all([
+      supabase.from("Carpetas_Recrusos_Categoria")
+        .select("categoria_id, Categorias(categoria_id, nombre)").in("carpeta_id", ids),
+      supabase.from("Carpetas_Recrusos_Categoria")
+        .select("carpeta_id, categoria_id").in("carpeta_id", ids),
+    ]).then(([{ data: joinData }, { data: mapData }]) => {
+      // Chips de filtro únicos
+      const seen = new Set<string>();
+      const cats: Categoria[] = [];
+      (joinData ?? []).forEach((r: CategoriaJoin) => {
+        const c = r.Categorias;
+        if (c && !seen.has(c.categoria_id)) { seen.add(c.categoria_id); cats.push(c); }
       });
+      setCategorias(cats);
+
+      // Mapa carpeta → categorías
+      const map: Record<string, string[]> = {};
+      (mapData ?? []).forEach((r: CategoriaRelacion) => {
+        if (!map[r.carpeta_id]) map[r.carpeta_id] = [];
+        map[r.carpeta_id].push(r.categoria_id);
+      });
+      setCarpetaCategorias(map);
+    });
   }, [carpeta?.carpeta_id, subCarpetas]);
 
   // Reset al cambiar de carpeta
@@ -216,22 +251,6 @@ export function CenterPanel({
 
   const canEdit = nivelAcceso === "owner" || nivelAcceso === "edicion";
   const isOwner = nivelAcceso === "owner";
-
-  // Mapa carpeta → categorías para filtro local
-  const [carpetaCategorias, setCarpetaCategorias] = useState<Record<string, string[]>>({});
-  useEffect(() => {
-    const ids = subCarpetas.map((c) => c.carpeta_id);
-    if (ids.length === 0) { setCarpetaCategorias({}); return; }
-    supabase.from("Carpetas_Recrusos_Categoria").select("carpeta_id, categoria_id").in("carpeta_id", ids)
-      .then(({ data }) => {
-        const map: Record<string, string[]> = {};
-        (data ?? []).forEach((r: any) => {
-          if (!map[r.carpeta_id]) map[r.carpeta_id] = [];
-          map[r.carpeta_id].push(r.categoria_id);
-        });
-        setCarpetaCategorias(map);
-      });
-  }, [subCarpetas]);
 
   const subCarpetasFiltradas = subCarpetas.filter((sc) => {
     const matchBusqueda = sc.nombre.toLowerCase().includes(busquedaLocal.toLowerCase());
@@ -277,7 +296,6 @@ export function CenterPanel({
     setSavingRecursoEtiqueta(false);
   }
 
-  // Cuando se crea una etiqueta nueva desde cualquier picker, añadirla al catálogo global
   function handleNuevaEtiqueta(e: Etiqueta) {
     setTodasEtiquetas((prev) => [...prev, e].sort((a, b) => a.nombre.localeCompare(b.nombre)));
   }
@@ -478,7 +496,7 @@ export function CenterPanel({
                     ))}
                     <span className={styles.resourceDate}>{fmtDate(r.created_at)}</span>
                     {canEdit && (
-                      <span className={styles.resourceDelete} style={{ display: "flex", gap: 4 }}>
+                      <span className={styles.resourceDelete}>
                         <button className={styles.btnIcon} title="Etiquetas"
                           onClick={(e) => { e.stopPropagation(); setRecursoEtiquetaOpen(etiquetaOpen ? null : r.recurso_id); }}>
                           🔖
@@ -517,17 +535,17 @@ export function CenterPanel({
       )}
 
       {selectedRecurso && (
-        <div style={{ marginTop: 20 }}>
+        <div className={styles.resourceDetailWrap}>
           <div className={styles.resourceDetail}>
             <div className={styles.resourceDetailHeader}>
-              <span style={{ fontSize: 22 }}>📄</span>
+              <span className={styles.resourceDetailIcon}>📄</span>
               <div>
                 <div className={styles.resourceDetailName}>{selectedRecurso.nombre}</div>
                 <div className={styles.resourceDetailMeta}>Creado {fmtDate(selectedRecurso.created_at)}</div>
               </div>
             </div>
             <div className={styles.resourceContent}>
-              {selectedRecurso.contenido || <span style={{ opacity: .4 }}>Sin contenido</span>}
+              {selectedRecurso.contenido || <span className={styles.resourceContentEmpty}>Sin contenido</span>}
             </div>
           </div>
         </div>

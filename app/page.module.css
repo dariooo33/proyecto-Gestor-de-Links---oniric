@@ -1250,3 +1250,63 @@
   max-height: 200px;
   overflow-y: auto;
 }
+/* ── Estilos añadidos en limpieza ────────────────────────────────────────── */
+
+/* Botón de peligro (confirmar eliminación) */
+.btnDanger {
+  background: var(--danger, #e53e3e) !important;
+}
+.btnDanger:hover {
+  background: #c53030 !important;
+}
+
+/* Caja de creación inline de etiquetas en CenterPanel */
+.etiquetaCrearBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.etiquetaCrearActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* Wrap de búsqueda de etiquetas en Modals */
+.etiquetaSearchWrap {
+  position: relative;
+}
+.etiquetaSearchIcon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  opacity: 0.4;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Item cursiva en lista de etiquetas */
+.etiquetaListItemItalic {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Resource detail wrapper */
+.resourceDetailWrap {
+  margin-top: 20px;
+}
+.resourceDetailIcon {
+  font-size: 22px;
+}
+.resourceContentEmpty {
+  opacity: 0.4;
+}
+
+/* Resource delete — reemplaza inline style */
+.resourceDelete {
+  display: flex;
+  gap: 4px;
+}

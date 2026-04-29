@@ -17,12 +17,22 @@ interface ResultadoBusqueda {
   subtitulo?: string;
 }
 
+// Tipos para resultados de Supabase
+interface PermisoCarpetaId { carpeta_id: string; }
+interface CarpetaBusqueda { carpeta_id: string; nombre: string; user_id: string; publica: boolean; }
+interface RecursoBusqueda { recurso_id: string; nombre: string; carpeta_id: string; }
+interface CategoriaBusqueda { categoria_id: string; nombre: string; descripcion: string; }
+interface UsuarioBusqueda { user_id: string; nombre: string; email: string; }
+
+const ICONO_TIPO: Record<string, string> = {
+  carpeta: "📁", recurso: "📄", categoria: "🏷️", usuario: "👤",
+};
+
 export default function Header() {
   const router = useRouter();
   const [usuario, setUsuario] = useState<undefined | null | UsuarioSession>(undefined);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Búsqueda global
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState<ResultadoBusqueda[]>([]);
   const [searching, setSearching] = useState(false);
@@ -49,7 +59,6 @@ export default function Header() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Cerrar resultados al click fuera
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
@@ -60,34 +69,51 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Búsqueda con debounce
   const buscar = useCallback(async (q: string) => {
     if (!q.trim() || !userId) { setResultados([]); return; }
     setSearching(true);
 
     const term = q.trim();
-    const resultados: ResultadoBusqueda[] = [];
+    const encontrados: ResultadoBusqueda[] = [];
 
-    // IDs de carpetas compartidas con el usuario
     const { data: permisosData } = await supabase
       .from("Permisos")
       .select("carpeta_id")
       .eq("user_id", userId);
-    const sharedIds = (permisosData ?? []).map((p: any) => p.carpeta_id as string);
+    const sharedIds = (permisosData ?? []).map((p: PermisoCarpetaId) => p.carpeta_id);
 
-    // Carpetas propias + públicas + compartidas con el usuario
     let carpetasFilter = `user_id.eq.${userId},publica.eq.true`;
     if (sharedIds.length > 0) carpetasFilter += `,carpeta_id.in.(${sharedIds.join(",")})`;
 
-    const { data: carpetas } = await supabase
-      .from("Carpetas")
-      .select("carpeta_id, nombre, user_id, publica")
-      .ilike("nombre", `%${term}%`)
-      .or(carpetasFilter)
-      .limit(5);
+    const [
+      { data: carpetas },
+      { data: recursos },
+      { data: categorias },
+      { data: usuarios },
+    ] = await Promise.all([
+      supabase.from("Carpetas")
+        .select("carpeta_id, nombre, user_id, publica")
+        .ilike("nombre", `%${term}%`)
+        .or(carpetasFilter)
+        .limit(5),
+      supabase.from("Recursos")
+        .select("recurso_id, nombre, carpeta_id")
+        .eq("user_id", userId)
+        .ilike("nombre", `%${term}%`)
+        .limit(5),
+      supabase.from("Categorias")
+        .select("categoria_id, nombre, descripcion")
+        .ilike("nombre", `%${term}%`)
+        .limit(4),
+      supabase.from("Usuario")
+        .select("user_id, nombre, email")
+        .neq("user_id", userId)
+        .or(`nombre.ilike.%${term}%,email.ilike.%${term}%`)
+        .limit(3),
+    ]);
 
-    (carpetas ?? []).forEach((c: any) => {
-      resultados.push({
+    (carpetas ?? []).forEach((c: CarpetaBusqueda) => {
+      encontrados.push({
         tipo: "carpeta",
         id: c.carpeta_id,
         titulo: c.nombre,
@@ -99,42 +125,19 @@ export default function Header() {
       });
     });
 
-    // Recursos propios
-    const { data: recursos } = await supabase
-      .from("Recursos")
-      .select("recurso_id, nombre, carpeta_id")
-      .eq("user_id", userId)
-      .ilike("nombre", `%${term}%`)
-      .limit(5);
-
-    (recursos ?? []).forEach((r: any) => {
-      resultados.push({ tipo: "recurso", id: r.recurso_id, titulo: r.nombre, subtitulo: "Recurso" });
+    (recursos ?? []).forEach((r: RecursoBusqueda) => {
+      encontrados.push({ tipo: "recurso", id: r.recurso_id, titulo: r.nombre, subtitulo: "Recurso" });
     });
 
-    // Categorías
-    const { data: categorias } = await supabase
-      .from("Categorias")
-      .select("categoria_id, nombre, descripcion")
-      .ilike("nombre", `%${term}%`)
-      .limit(4);
-
-    (categorias ?? []).forEach((c: any) => {
-      resultados.push({ tipo: "categoria", id: c.categoria_id, titulo: c.nombre, subtitulo: c.descripcion || "Categoría" });
+    (categorias ?? []).forEach((c: CategoriaBusqueda) => {
+      encontrados.push({ tipo: "categoria", id: c.categoria_id, titulo: c.nombre, subtitulo: c.descripcion || "Categoría" });
     });
 
-    // Usuarios
-    const { data: usuarios } = await supabase
-      .from("Usuario")
-      .select("user_id, nombre, email")
-      .neq("user_id", userId)
-      .or(`nombre.ilike.%${term}%,email.ilike.%${term}%`)
-      .limit(3);
-
-    (usuarios ?? []).forEach((u: any) => {
-      resultados.push({ tipo: "usuario", id: u.user_id, titulo: u.nombre, subtitulo: u.email });
+    (usuarios ?? []).forEach((u: UsuarioBusqueda) => {
+      encontrados.push({ tipo: "usuario", id: u.user_id, titulo: u.nombre, subtitulo: u.email });
     });
 
-    setResultados(resultados);
+    setResultados(encontrados);
     setSearching(false);
     setShowResults(true);
   }, [userId]);
@@ -159,10 +162,6 @@ export default function Header() {
     }
   }
 
-  const iconoTipo: Record<string, string> = {
-    carpeta: "📁", recurso: "📄", categoria: "🏷️", usuario: "👤",
-  };
-
   const cerrarSesion = async () => {
     await supabase.auth.signOut();
     router.push("/login");
@@ -179,7 +178,6 @@ export default function Header() {
             <h1>GESTOR DE LINKS - ONIRIC VIEW</h1>
           </div>
 
-          {/* Búsqueda global */}
           <div className={styles.centro} ref={searchRef}>
             <div className={styles.searchWrapper}>
               <input
@@ -197,7 +195,7 @@ export default function Header() {
                   {resultados.map((r) => (
                     <div key={`${r.tipo}-${r.id}`} className={styles.searchResult}
                       onClick={() => handleClick(r)}>
-                      <span className={styles.searchResultIcon}>{iconoTipo[r.tipo]}</span>
+                      <span className={styles.searchResultIcon}>{ICONO_TIPO[r.tipo]}</span>
                       <div className={styles.searchResultInfo}>
                         <span className={styles.searchResultTitulo}>{r.titulo}</span>
                         {r.subtitulo && <span className={styles.searchResultSub}>{r.subtitulo}</span>}
@@ -213,7 +211,7 @@ export default function Header() {
               )}
               {showResults && !searching && query.length >= 2 && resultados.length === 0 && (
                 <div className={styles.searchDropdown}>
-                  <div className={styles.searchEmpty}>Sin resultados para "{query}"</div>
+                  <div className={styles.searchEmpty}>Sin resultados para &quot;{query}&quot;</div>
                 </div>
               )}
             </div>

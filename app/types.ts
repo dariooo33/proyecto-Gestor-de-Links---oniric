@@ -39,6 +39,12 @@ export interface UsuarioBusqueda {
   email: string;
 }
 
+export interface Etiqueta {
+  etiqueta_id: string;
+  nombre: string;
+  descripcion?: string;
+}
+
 export type TreeNode = Carpeta & { children: TreeNode[] };
 
 export type NivelAcceso = "owner" | "edicion" | "lectura" | null;

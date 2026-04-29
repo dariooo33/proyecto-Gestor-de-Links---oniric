@@ -32,7 +32,6 @@ function EtiquetasPicker({
     : etiquetas;
 
   const selSet = new Set(seleccionadas);
-  // Seleccionadas primero, luego el resto
   const ordenadas = [
     ...filtradas.filter((e) => selSet.has(e.etiqueta_id)),
     ...filtradas.filter((e) => !selSet.has(e.etiqueta_id)),
@@ -61,7 +60,6 @@ function EtiquetasPicker({
 
   return (
     <div>
-      {/* Chips de seleccionadas — siempre visibles arriba */}
       {seleccionadas.length > 0 && (
         <div className={styles.etiquetaSelectorWrap} style={{ marginBottom: 6 }}>
           {etiquetas
@@ -79,12 +77,8 @@ function EtiquetasPicker({
         </div>
       )}
 
-      {/* Input de búsqueda */}
-      <div style={{ position: "relative" }}>
-        <span style={{
-          position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)",
-          fontSize: 12, opacity: 0.4, pointerEvents: "none", lineHeight: 1,
-        }}>🔍</span>
+      <div className={styles.etiquetaSearchWrap}>
+        <span className={styles.etiquetaSearchIcon}>🔍</span>
         <input
           ref={inputRef}
           className={styles.modalInput}
@@ -98,7 +92,6 @@ function EtiquetasPicker({
         />
       </div>
 
-      {/* Lista scrolleable */}
       {!creando && (
         <div className={styles.etiquetaListBox}>
           {ordenadas.map((e) => {
@@ -116,12 +109,10 @@ function EtiquetasPicker({
             );
           })}
 
-          {/* Sin resultados → ofrecer crear */}
           {noHayCoincidencias && (
             <button
               type="button"
-              className={styles.etiquetaListItem}
-              style={{ fontStyle: "italic", opacity: 0.8 }}
+              className={`${styles.etiquetaListItem} ${styles.etiquetaListItemItalic}`}
               onClick={() => setCreando(true)}
             >
               <span className={styles.etiquetaListCheck}>+</span>
@@ -130,14 +121,13 @@ function EtiquetasPicker({
           )}
 
           {etiquetas.length === 0 && !texto && (
-            <span style={{ padding: "6px 10px", display: "block", opacity: 0.5, fontSize: 13 }}>
+            <span className={styles.etiquetaEmpty} style={{ padding: "6px 10px", display: "block" }}>
               No hay etiquetas aún
             </span>
           )}
         </div>
       )}
 
-      {/* Formulario creación */}
       {!creando ? (
         !noHayCoincidencias && (
           <button
@@ -188,7 +178,6 @@ function EtiquetasPicker({
 }
 
 // ── Modal Carpeta ─────────────────────────────────────────────────────────
-
 export function ModalCarpeta({ tree, defaultParentId, userId, onClose, onSave }: {
   tree: TreeNode[];
   defaultParentId: string | null;
@@ -212,10 +201,13 @@ export function ModalCarpeta({ tree, defaultParentId, userId, onClose, onSave }:
   const allFolders = flatFolders(tree);
 
   useEffect(() => {
-    supabase.from("Categorias").select("*").order("nombre")
-      .then(({ data }) => setCategorias((data as Categoria[]) ?? []));
-    supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion").order("nombre")
-      .then(({ data }) => setEtiquetas((data as Etiqueta[]) ?? []));
+    Promise.all([
+      supabase.from("Categorias").select("*").order("nombre"),
+      supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion").order("nombre"),
+    ]).then(([{ data: cats }, { data: etqs }]) => {
+      setCategorias((cats as Categoria[]) ?? []);
+      setEtiquetas((etqs as Etiqueta[]) ?? []);
+    });
   }, []);
 
   async function handleCrearCategoria() {
@@ -320,7 +312,6 @@ export function ModalCarpeta({ tree, defaultParentId, userId, onClose, onSave }:
 }
 
 // ── Modal Recurso ─────────────────────────────────────────────────────────
-
 export function ModalRecurso({ onClose, onSave }: {
   onClose: () => void;
   onSave: (nombre: string, contenido: string, etiquetaIds: string[]) => Promise<void>;
@@ -379,6 +370,28 @@ export function ModalRecurso({ onClose, onSave }: {
           <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
           <button type="button" className={styles.btnPrimary} disabled={!nombre.trim() || saving} onClick={handleSave}>
             {saving ? "Guardando…" : "Crear recurso"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Confirmación (reemplaza confirm() nativo) ───────────────────────
+export function ModalConfirm({ message, onConfirm, onCancel }: {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className={styles.modalOverlay} onClick={onCancel}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+        <div className={styles.modalTitle}>⚠️ Confirmar</div>
+        <p className={styles.permisosDesc}>{message}</p>
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onCancel}>Cancelar</button>
+          <button type="button" className={`${styles.btnPrimary} ${styles.btnDanger}`} onClick={onConfirm}>
+            Confirmar
           </button>
         </div>
       </div>
