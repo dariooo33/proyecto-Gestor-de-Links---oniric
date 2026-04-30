@@ -54,3 +54,8 @@ body {
 
 /* ─── Selection ───────────────────────────────────────────────────────────── */
 ::selection { background: var(--accent-glow); color: var(--accent); }
+
+/* ─── Responsive base ─────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  html, body { overflow: auto; }
+}

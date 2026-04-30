@@ -37,6 +37,7 @@ export default function Header() {
   const [resultados, setResultados] = useState<ResultadoBusqueda[]>([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -170,14 +171,16 @@ export default function Header() {
   return (
     <header className={styles.header}>
       <nav className={styles.nav}>
-        <ul>
+        {/* ── Fila principal ── */}
+        <div className={styles.navRow}>
           <div className={styles.izquierda}>
             <div className={styles.logo}>
               <a href="/"><img src="/logo.png" alt="logo" /></a>
             </div>
           </div>
 
-          <div className={styles.centro} ref={searchRef}>
+          {/* Buscador — oculto en móvil, visible en la fila inferior */}
+          <div className={`${styles.centro} ${styles.centroDesktop}`} ref={searchRef}>
             <div className={styles.searchWrapper}>
               <input
                 type="text"
@@ -216,9 +219,9 @@ export default function Header() {
             </div>
           </div>
 
-          <div className={styles.derecha}>
+          {/* Links derecha — desktop */}
+          <div className={`${styles.derecha} ${styles.derechaDesktop}`}>
             <li><a href="/">MENU</a></li>
-
             {usuario === undefined ? (
               <li className={styles.cargando}>...</li>
             ) : usuario ? (
@@ -238,7 +241,81 @@ export default function Header() {
               </>
             )}
           </div>
-        </ul>
+
+          {/* Hamburguesa — solo móvil */}
+          <button
+            className={styles.hamburger}
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Menú"
+          >
+            <span className={menuOpen ? styles.hambLineTop + " " + styles.hambOpen : styles.hambLineTop}></span>
+            <span className={menuOpen ? styles.hambLineMid + " " + styles.hambOpen : styles.hambLineMid}></span>
+            <span className={menuOpen ? styles.hambLineBot + " " + styles.hambOpen : styles.hambLineBot}></span>
+          </button>
+        </div>
+
+        {/* ── Buscador móvil (siempre visible bajo el nav en móvil) ── */}
+        <div className={styles.centroMobile} ref={searchRef}>
+          <div className={styles.searchWrapper}>
+            <input
+              type="text"
+              placeholder="Buscar…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => resultados.length > 0 && setShowResults(true)}
+              onKeyDown={handleKeyDown}
+              className={styles.searchInput}
+            />
+            {searching && <span className={styles.searchSpinner}>⟳</span>}
+            {showResults && resultados.length > 0 && (
+              <div className={styles.searchDropdown}>
+                {resultados.map((r) => (
+                  <div key={`${r.tipo}-${r.id}`} className={styles.searchResult}
+                    onClick={() => handleClick(r)}>
+                    <span className={styles.searchResultIcon}>{ICONO_TIPO[r.tipo]}</span>
+                    <div className={styles.searchResultInfo}>
+                      <span className={styles.searchResultTitulo}>{r.titulo}</span>
+                      {r.subtitulo && <span className={styles.searchResultSub}>{r.subtitulo}</span>}
+                    </div>
+                    <span className={styles.searchResultTipo}>{r.tipo}</span>
+                  </div>
+                ))}
+                <div className={styles.searchResult} style={{ justifyContent: "center", opacity: .6 }}
+                  onClick={() => { setShowResults(false); router.push(`/buscar?q=${encodeURIComponent(query)}`); }}>
+                  <span style={{ fontSize: 12 }}>Ver todos los resultados →</span>
+                </div>
+              </div>
+            )}
+            {showResults && !searching && query.length >= 2 && resultados.length === 0 && (
+              <div className={styles.searchDropdown}>
+                <div className={styles.searchEmpty}>Sin resultados para &quot;{query}&quot;</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Menú móvil desplegable ── */}
+        {menuOpen && (
+          <div className={styles.mobileMenu}>
+            <a href="/" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>MENU</a>
+            {usuario === undefined ? null : usuario ? (
+              <>
+                {usuario.rol === "admin" && (
+                  <a href="/admin" className={`${styles.mobileLink} ${styles.btnAdmin}`} onClick={() => setMenuOpen(false)}>⚙️ Admin</a>
+                )}
+                <span className={styles.mobileEmail}>{usuario.email}</span>
+                <button onClick={() => { cerrarSesion(); setMenuOpen(false); }} className={`${styles.mobileLink} ${styles.btnCerrar}`}>
+                  Cerrar sesión
+                </button>
+              </>
+            ) : (
+              <>
+                <a href="/register" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>Registro</a>
+                <a href="/login" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>Login</a>
+              </>
+            )}
+          </div>
+        )}
       </nav>
     </header>
   );

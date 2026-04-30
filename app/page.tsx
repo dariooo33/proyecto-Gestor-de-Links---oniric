@@ -28,6 +28,7 @@ export default function Home() {
   const [showModalRecurso, setShowModalRecurso] = useState(false);
   const [showModalPermisos, setShowModalPermisos] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Modal de confirmación reutilizable
   const [confirm, setConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
@@ -343,9 +344,12 @@ if (etiquetaIds.length > 0) {
     <>
       <main className={styles.main}>
         <div className={styles.topBar}>
+          <button className={styles.sidebarToggle} onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Abrir sidebar">
+            ☰
+          </button>
           <div className={styles.logo}>
             <span className={styles.logoIcon}>🗂</span>
-            GESTOR DE LINKS - ONIRIC VIEW
+            GESTOR DE LINKS
           </div>
           <nav className={styles.topNav}>
             <button className={styles.btnPrimary} onClick={() => {
@@ -357,7 +361,9 @@ if (etiquetaIds.length > 0) {
           </nav>
         </div>
 
-        <div className={styles.sidebar}>
+        {sidebarOpen && <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />}
+        <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarVisible : ""}`}>
+          <button className={styles.sidebarClose} onClick={() => setSidebarOpen(false)}>✕</button>
           <div className={styles.sidebarHeader}>
             <span className={styles.sidebarTitle}>Carpetas</span>
           </div>

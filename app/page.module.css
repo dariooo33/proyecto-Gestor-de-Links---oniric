@@ -1311,3 +1311,123 @@
   display: flex;
   gap: 4px;
 }
+
+/* ─── Sidebar toggle (botón móvil en topBar) ──────────────────────────────── */
+.sidebarToggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  transition: color .15s, background .15s;
+  flex-shrink: 0;
+}
+.sidebarToggle:hover { color: var(--accent); background: rgba(255,255,255,.05); }
+
+.sidebarClose {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 7px;
+  border-radius: var(--radius);
+  transition: color .15s;
+}
+.sidebarClose:hover { color: var(--danger); }
+
+.sidebarOverlay {
+  display: none;
+  position: fixed;
+  top: 116px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 49;
+  animation: fadeIn .2s ease;
+}
+
+/* ─── RESPONSIVE ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  html, body { overflow: auto; }
+
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .topBar { padding: 0 12px; gap: 8px; }
+
+  .sidebarToggle { display: flex; }
+  .sidebarClose  { display: block; }
+  .sidebarOverlay { display: block; }
+
+  /* Sidebar como drawer lateral — empieza justo bajo el .main (topBar) */
+  .sidebar {
+    position: fixed;
+    /* El header externo (~62px navRow + ~38px buscador móvil = ~100px)
+       más el topBar interno (54px) = ~154px. Usamos una variable CSS
+       calculada desde el top del documento. */
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform .28s ease;
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 24px rgba(0,0,0,.5);
+    /* El padding-top empuja el contenido por debajo de ambos headers */
+    padding-top: 154px;
+  }
+
+  .sidebarVisible {
+    transform: translateX(0);
+  }
+
+  /* El overlay cubre toda la pantalla detrás del drawer */
+  .sidebarOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 49;
+  }
+
+  /* Panel central ocupa todo el ancho */
+  .center {
+    grid-column: 1;
+    padding: 20px 16px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  /* Folder grid más compacto */
+  .folderGrid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  /* Modales a pantalla completa en móvil */
+  .modal {
+    width: calc(100vw - 32px);
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .folderGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .btnPrimary { font-size: 12px; padding: 5px 10px; }
+}
