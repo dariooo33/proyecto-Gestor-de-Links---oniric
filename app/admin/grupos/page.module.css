@@ -389,6 +389,54 @@
 }
 .btnActionDanger:hover { background: #ef444422; border-color: #ef4444; color: #ef4444; }
 
+/* ─── Tabs ───────────────────────────────────────────────────────────────── */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.tabBtn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  padding: 8px 18px;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color .15s;
+}
+.tabBtn:hover { color: var(--text); }
+.tabBtnActive {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── Search row (carpeta + nivel) ──────────────────────────────────────── */
+.searchRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.nivelSelect {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-body);
+  padding: 8px 10px;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* ─── Empty state ────────────────────────────────────────────────────────── */
 .emptyState {
   text-align: center;
