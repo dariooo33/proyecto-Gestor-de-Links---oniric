@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./page.module.css";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -322,7 +322,12 @@ export default function AdminPage() {
             <p className={styles.headerSub}>{usuarios.length} usuarios registrados</p>
           </div>
         </div>
-        <button className={styles.btnBack} onClick={() => router.push("/")}>← Volver</button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className={styles.btnBack} onClick={() => router.push("/admin/grupos")} style={{ background: "var(--accent)", color: "#fff", borderColor: "var(--accent)" }}>
+            👥 Grupos
+          </button>
+          <button className={styles.btnBack} onClick={() => router.push("/")}>← Volver</button>
+        </div>
       </div>
 
       <div className={styles.toolbar}>

@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { TreeNode } from "../types";
 import styles from "../page.module.css";
 
-// ── Tipos internos ─────────────────────────────────────────────────────────
 interface ContextMenuState {
   x: number;
   y: number;
@@ -13,14 +12,7 @@ interface ContextMenuState {
 
 // ── Menú contextual ────────────────────────────────────────────────────────
 function ContextMenu({
-  menu,
-  userId,
-  onClose,
-  onRename,
-  onDelete,
-  onNewFolder,
-  onNewResource,
-  onPermissions,
+  menu, userId, onClose, onRename, onDelete, onNewFolder, onNewResource, onPermissions,
 }: {
   menu: ContextMenuState;
   userId: string | null;
@@ -49,7 +41,6 @@ function ContextMenu({
     };
   }, [onClose]);
 
-  // Ajustar posición si se sale de la pantalla
   const style: React.CSSProperties = {
     position: "fixed",
     top: menu.y,
@@ -96,24 +87,9 @@ function ContextMenu({
 
 // ── Nodo individual del árbol ──────────────────────────────────────────────
 function TreeNodeRow({
-  node,
-  depth,
-  selectedId,
-  expandedIds,
-  draggingId,
-  dragOverId,
-  onSelect,
-  onToggle,
-  onDelete,
-  onContextMenu,
-  onRenameSubmit,
-  renamingId,
-  sharedIds,
-  userId,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
+  node, depth, selectedId, expandedIds, draggingId, dragOverId,
+  onSelect, onToggle, onDelete, onContextMenu, onRenameSubmit,
+  renamingId, sharedIds, userId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   node: TreeNode;
   depth: number;
@@ -155,18 +131,18 @@ function TreeNodeRow({
 
   function handleRenameKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") onRenameSubmit(node.carpeta_id, renameValue);
-    if (e.key === "Escape") onRenameSubmit(node.carpeta_id, node.nombre); // cancelar → nombre original
+    if (e.key === "Escape") onRenameSubmit(node.carpeta_id, node.nombre);
   }
 
   return (
     <div key={node.carpeta_id}>
       <div
-        className={`
-          ${styles.treeNode}
-          ${isSelected ? styles.selected : ""}
-          ${isDragging ? styles.treeNodeDragging : ""}
-          ${isDragOver ? styles.treeNodeDragOver : ""}
-        `}
+        className={[
+          styles.treeNode,
+          isSelected ? styles.selected : "",
+          isDragging ? styles.treeNodeDragging : "",
+          isDragOver ? styles.treeNodeDragOver : "",
+        ].filter(Boolean).join(" ")}
         style={{ paddingLeft: `${10 + depth * 14}px` }}
         draggable={isOwner}
         onDragStart={() => isOwner && onDragStart(node.carpeta_id)}
@@ -186,7 +162,6 @@ function TreeNodeRow({
           onClick={() => { onSelect(node.carpeta_id); onToggle(node.carpeta_id); }}
         >{isExpanded ? "📂" : "📁"}</span>
 
-        {/* Label o input de renombrado inline */}
         {isRenaming ? (
           <input
             ref={renameInputRef}
@@ -250,20 +225,9 @@ function TreeNodeRow({
 
 // ── Componente principal ───────────────────────────────────────────────────
 export function SidebarTree({
-  nodes,
-  depth,
-  selectedId,
-  expandedIds,
-  onSelect,
-  onToggle,
-  onDelete,
-  onRename,
-  onMove,
-  onNewFolder,
-  onNewResource,
-  onOpenPermisos,
-  sharedIds,
-  userId,
+  nodes, depth, selectedId, expandedIds,
+  onSelect, onToggle, onDelete, onRename, onMove,
+  onNewFolder, onNewResource, onOpenPermisos, sharedIds, userId,
 }: {
   nodes: TreeNode[];
   depth: number;
@@ -288,17 +252,13 @@ export function SidebarTree({
   function handleContextMenu(e: React.MouseEvent, node: TreeNode) {
     e.preventDefault();
     e.stopPropagation();
-    // Ajustar si sale de la pantalla
     const x = Math.min(e.clientX, window.innerWidth - 200);
     const y = Math.min(e.clientY, window.innerHeight - 260);
     setContextMenu({ x, y, node });
   }
 
   function handleRenameSubmit(id: string, nuevoNombre: string) {
-    if (nuevoNombre === "__EDIT__") {
-      setRenamingId(id);
-      return;
-    }
+    if (nuevoNombre === "__EDIT__") { setRenamingId(id); return; }
     setRenamingId(null);
     const node = findNode(nodes, id);
     if (nuevoNombre.trim() && nuevoNombre.trim() !== node?.nombre) {
@@ -310,13 +270,13 @@ export function SidebarTree({
     if (id !== draggingId) setDragOverId(id);
   }
 
-  async function handleDrop(targetId: string) {
+  const handleDrop = useCallback(async (targetId: string) => {
     if (draggingId && draggingId !== targetId) {
       await onMove(draggingId, targetId);
     }
     setDraggingId(null);
     setDragOverId(null);
-  }
+  }, [draggingId, onMove]);
 
   return (
     <>

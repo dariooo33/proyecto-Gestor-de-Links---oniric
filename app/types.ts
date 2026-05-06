@@ -39,6 +39,39 @@ export interface UsuarioBusqueda {
   email: string;
 }
 
+export interface Etiqueta {
+  etiqueta_id: string;
+  nombre: string;
+  descripcion?: string;
+}
+
 export type TreeNode = Carpeta & { children: TreeNode[] };
 
 export type NivelAcceso = "owner" | "edicion" | "lectura" | null;
+
+// ─── Grupos ────────────────────────────────────────────────────────────────
+
+export interface Grupo {
+  grupo_id: string;
+  nombre: string;
+  descripcion: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface GrupoMiembro {
+  grupo_id: string;
+  user_id: string;
+  added_at: string;
+  Usuario?: { nombre: string; email: string };
+}
+
+export interface PermisoGrupo {
+  permiso_grupo_id: string;
+  carpeta_id: string;
+  grupo_id: string;
+  owner_id: string;
+  nivel: "lectura" | "edicion";
+  created_at: string;
+  Grupo?: { nombre: string };
+}
