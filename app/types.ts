@@ -21,6 +21,7 @@ export interface Recurso {
   carpeta_id: string;
   nombre: string;
   contenido: string;
+  url?: string | null;
 }
 
 export interface Permiso {

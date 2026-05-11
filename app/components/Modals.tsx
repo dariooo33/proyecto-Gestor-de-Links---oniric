@@ -314,10 +314,11 @@ export function ModalCarpeta({ tree, defaultParentId, userId, onClose, onSave }:
 // ── Modal Recurso ─────────────────────────────────────────────────────────
 export function ModalRecurso({ onClose, onSave }: {
   onClose: () => void;
-  onSave: (nombre: string, contenido: string, etiquetaIds: string[]) => Promise<void>;
+  onSave: (nombre: string, contenido: string, etiquetaIds: string[], url: string) => Promise<void>;
 }) {
   const [nombre, setNombre] = useState("");
   const [contenido, setContenido] = useState("");
+  const [url, setUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
@@ -331,7 +332,7 @@ export function ModalRecurso({ onClose, onSave }: {
   async function handleSave() {
     if (!nombre.trim()) return;
     setSaving(true);
-    await onSave(nombre.trim(), contenido, etiquetasSeleccionadas);
+    await onSave(nombre.trim(), contenido, etiquetasSeleccionadas, url.trim());
     setSaving(false);
   }
 
@@ -348,6 +349,11 @@ export function ModalRecurso({ onClose, onSave }: {
         <textarea className={styles.modalTextarea} value={contenido}
           onChange={(e) => setContenido(e.target.value)}
           placeholder="Contenido del recurso (opcional)…" />
+
+        <div className={styles.modalLabel}>URL <span className={styles.modalLabelOpt}>(opcional)</span></div>
+        <input className={styles.modalInput} value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://…" type="url" />
 
         <div className={styles.modalLabel}>
           Etiquetas <span className={styles.modalLabelOpt}>(opcional, múltiple)</span>

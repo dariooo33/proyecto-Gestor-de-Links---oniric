@@ -214,6 +214,71 @@
   font-style: italic;
 }
 
+/* ─── Sidebar recursos toggle ─────────────────────────────────────────────── */
+.sidebarRecursosToggle {
+  padding: 6px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.sidebarRecursosLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: .03em;
+}
+
+.sidebarRecursosLabel:hover {
+  color: var(--text);
+}
+
+.sidebarRecursosCheck {
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ─── Recurso rows in sidebar ─────────────────────────────────────────────── */
+.sidebarRecursoRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+  border-radius: 7px;
+  margin: 1px 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: background var(--transition), color var(--transition);
+  user-select: none;
+}
+
+.sidebarRecursoRow:hover {
+  background: var(--surface2);
+  color: var(--text-dim);
+}
+
+.sidebarRecursoIcon {
+  font-size: 12px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.sidebarRecursoLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
 /* ─── Center Panel ────────────────────────────────────────────────────────── */
 .center {
   background: var(--bg);
@@ -397,6 +462,35 @@
   text-overflow: ellipsis;
 }
 
+.resourceLink {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.resourceLink:hover {
+  text-decoration: underline;
+}
+
+.resourceUrlChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  text-decoration: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background var(--transition);
+}
+
+.resourceUrlChip:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 .resourceDate {
   font-size: 11px;
   color: var(--text-muted);
@@ -449,7 +543,14 @@
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
-  min-height: 120px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.resourceDetailUrl {
+  margin-top: 10px;
+  font-size: 12px;
+  word-break: break-all;
 }
 
 /* ─── Modal ───────────────────────────────────────────────────────────────── */
@@ -915,6 +1016,20 @@
   border: 1px solid rgba(78,203,141,.25);
 }
 
+.privadaBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-left: 10px;
+  vertical-align: middle;
+  background: rgba(160,160,180,.10);
+  color: var(--text-muted);
+  border: 1px solid rgba(160,160,180,.20);
+}
+
 /* Badge de categoría en el header de la carpeta */
 .categoriaBadge {
   display: inline-flex;
@@ -1297,7 +1412,9 @@
 
 /* Resource detail wrapper */
 .resourceDetailWrap {
-  margin-top: 20px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 .resourceDetailIcon {
   font-size: 22px;

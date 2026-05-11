@@ -11,7 +11,7 @@ interface Etiqueta { etiqueta_id: string; nombre: string; descripcion?: string; 
 // Tipos intermedios para resultados de join de Supabase
 interface EtiquetaRelacion { etiqueta_id: string; }
 interface CategoriaRelacion { carpeta_id: string; categoria_id: string; }
-interface CategoriaJoin { Categorias: { categoria_id: string; nombre: string } | null; }
+interface CategoriaJoin { Categorias: Categoria | Categoria[] | null; }
 
 // ── Selector de etiquetas con creación inline ──────────────────────────────
 function EtiquetasPicker({
@@ -203,7 +203,7 @@ export function CenterPanel({
     }
     Promise.all([
       supabase.from("Carpetas_Recrusos_Categoria")
-        .select("categoria_id, Categorias(categoria_id, nombre)").in("carpeta_id", ids),
+        .select("categoria_id, Categorias(categoria_id, nombre, descripcion, created_at)").in("carpeta_id", ids),
       supabase.from("Carpetas_Recrusos_Categoria")
         .select("carpeta_id, categoria_id").in("carpeta_id", ids),
     ]).then(([{ data: joinData }, { data: mapData }]) => {
@@ -211,7 +211,8 @@ export function CenterPanel({
       const seen = new Set<string>();
       const cats: Categoria[] = [];
       (joinData ?? []).forEach((r: CategoriaJoin) => {
-        const c = r.Categorias;
+        const raw = r.Categorias;
+        const c = Array.isArray(raw) ? raw[0] : raw;
         if (c && !seen.has(c.categoria_id)) { seen.add(c.categoria_id); cats.push(c); }
       });
       setCategorias(cats);
@@ -331,6 +332,7 @@ export function CenterPanel({
           <div className={styles.folderHeaderName}>
             {carpeta.nombre}
             {carpeta.publica && <span className={styles.publicaBadge}>🌐 Pública</span>}
+            {!carpeta.publica && <span className={styles.privadaBadge}>🔒 Privada</span>}
             {nivelAcceso === "lectura" && <span className={styles.nivelBadge} data-nivel="lectura">👁 Solo lectura</span>}
             {nivelAcceso === "edicion" && <span className={styles.nivelBadge} data-nivel="edicion">✏️ Edición</span>}
             {categoriaActualNombre && (
@@ -490,7 +492,33 @@ export function CenterPanel({
                   <div className={styles.resourceRow}
                     onClick={() => setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r)}>
                     <span className={styles.resourceIcon}>📄</span>
-                    <span className={styles.resourceName}>{r.nombre}</span>
+                    <span className={styles.resourceName}>
+                      {r.url ? (
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.resourceLink}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {r.nombre}
+                        </a>
+                      ) : (
+                        r.nombre
+                      )}
+                    </span>
+                    {r.url && (
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.resourceUrlChip}
+                        onClick={(e) => e.stopPropagation()}
+                        title={r.url}
+                      >
+                        🔗 URL
+                      </a>
+                    )}
                     {etiObjs.map((e) => (
                       <span key={e.etiqueta_id} className={styles.etiquetaBadgeSmall}>{e.nombre}</span>
                     ))}
@@ -547,6 +575,13 @@ export function CenterPanel({
             <div className={styles.resourceContent}>
               {selectedRecurso.contenido || <span className={styles.resourceContentEmpty}>Sin contenido</span>}
             </div>
+            {selectedRecurso.url && (
+              <div className={styles.resourceDetailUrl}>
+                <a href={selectedRecurso.url} target="_blank" rel="noopener noreferrer" className={styles.resourceLink}>
+                  🔗 {selectedRecurso.url}
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
