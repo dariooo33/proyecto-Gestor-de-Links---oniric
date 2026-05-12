@@ -27,6 +27,7 @@ export default function Home() {
   const [showModalCarpeta, setShowModalCarpeta] = useState(false);
   const [showModalRecurso, setShowModalRecurso] = useState(false);
   const [showModalPermisos, setShowModalPermisos] = useState(false);
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -295,10 +296,10 @@ if (etiquetaIds.length > 0) {
     }
   }
 
-  async function handleCreateRecurso(nombre: string, contenido: string, etiquetaIds: string[]) {
+  async function handleCreateRecurso(nombre: string, contenido: string, etiquetaIds: string[], url: string) {
     if (!selectedId || !userId) return;
     const { data: nuevo, error } = await supabase.from("Recursos")
-      .insert({ user_id: userId, carpeta_id: selectedId, nombre, contenido })
+      .insert({ user_id: userId, carpeta_id: selectedId, nombre, contenido, url: url || null })
       .select("recurso_id").single();
     if (error || !nuevo) { setError(error?.message ?? "Error al crear recurso"); return; }
 
@@ -310,6 +311,7 @@ if (etiquetaIds.length > 0) {
 
     await loadRecursos(selectedId);
     setShowModalRecurso(false);
+    setSidebarRefreshTrigger((v) => v + 1);
   }
 
   async function handleDeleteRecurso(recursoId: string) {
@@ -319,6 +321,7 @@ if (etiquetaIds.length > 0) {
         const { error } = await supabase.from("Recursos").delete().eq("recurso_id", recursoId);
         if (error) { setError(error.message); return; }
         if (selectedId) await loadRecursos(selectedId);
+        setSidebarRefreshTrigger((v) => v + 1);
       },
     });
   }
@@ -398,6 +401,11 @@ if (etiquetaIds.length > 0) {
               }}
               sharedIds={sharedIds}
               userId={userId}
+              onDeleteRecurso={handleDeleteRecurso}
+              onRefreshRecursos={(carpetaId) => {
+                if (carpetaId === selectedId) loadRecursos(carpetaId);
+              }}
+              refreshTrigger={sidebarRefreshTrigger}
             />
           )}
         </div>

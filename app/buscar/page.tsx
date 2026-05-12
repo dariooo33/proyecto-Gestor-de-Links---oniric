@@ -13,6 +13,15 @@ interface Resultado {
   extra?: string;
 }
 
+interface Carpeta {
+  carpeta_id: string;
+  nombre: string;
+  user_id: string;
+  publica: boolean;
+  created_at: string;
+  _origen: "propia" | "compartida" | "publica";
+}
+
 interface Categoria { categoria_id: string; nombre: string; }
 interface Etiqueta { etiqueta_id: string; nombre: string; }
 
@@ -41,7 +50,6 @@ function EtiquetasDropdown({
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cerrar al hacer click fuera
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
@@ -94,7 +102,6 @@ function EtiquetasDropdown({
 
       {abierto && (
         <div className={styles.etiquetasDropdownPanel}>
-          {/* Buscador */}
           <div style={{ padding: "6px 8px 4px", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
             <input
               ref={inputRef}
@@ -105,8 +112,6 @@ function EtiquetasDropdown({
               placeholder="Buscar etiqueta…"
             />
           </div>
-
-          {/* Lista */}
           <div className={styles.etiquetasDropdownList}>
             {ordenadas.length === 0 && (
               <span style={{ padding: "8px 12px", display: "block", opacity: 0.5, fontSize: 13 }}>
@@ -128,8 +133,6 @@ function EtiquetasDropdown({
               );
             })}
           </div>
-
-          {/* Footer con chips seleccionadas */}
           {seleccionadas.length > 0 && (
             <div style={{
               padding: "6px 8px",
@@ -157,18 +160,26 @@ function EtiquetasDropdown({
 export default function BuscarPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const query = searchParams.get("q") ?? "";
+  const queryParam = searchParams.get("q") ?? "";
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [inputQuery, setInputQuery] = useState(queryParam);
   const [resultados, setResultados] = useState<Resultado[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [filtro, setFiltro] = useState<string>("todos");
+
+  // Carpetas del usuario (pantalla inicial sin búsqueda)
+  const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
+  const [loadingCarpetas, setLoadingCarpetas] = useState(false);
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("");
-
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [etiquetasFiltro, setEtiquetasFiltro] = useState<string[]>([]);
+
+  // Sync input con URL param al llegar
+  useEffect(() => { setInputQuery(queryParam); }, [queryParam]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -184,11 +195,92 @@ export default function BuscarPage() {
       .then(({ data }) => setEtiquetas((data as Etiqueta[]) ?? []));
   }, []);
 
-  const buscar = useCallback(async () => {
+  // ── Carga de carpetas del usuario (pantalla inicial), con filtros ────────
+  const cargarCarpetas = useCallback(async () => {
+    if (!userId) return;
+    setLoadingCarpetas(true);
+
+    const { data: permisosData } = await supabase
+      .from("Permisos").select("carpeta_id").eq("user_id", userId);
+    const sharedIds = (permisosData ?? []).map((p: any) => p.carpeta_id as string);
+
+    // Calcular IDs válidos por filtros avanzados
+    let idsValidos: string[] | null = null;
+
+    if (categoriaFiltro) {
+      const { data } = await supabase.from("Carpetas_Recrusos_Categoria")
+        .select("carpeta_id").eq("categoria_id", categoriaFiltro).not("carpeta_id", "is", null);
+      idsValidos = (data ?? []).map((r: any) => r.carpeta_id as string);
+    }
+
+    if (etiquetasFiltro.length > 0) {
+      for (const eid of etiquetasFiltro) {
+        const { data } = await supabase.from("Carpetas_Recrusos_Etiquetas")
+          .select("carpeta_id").eq("etiqueta_id", eid).not("carpeta_id", "is", null);
+        const ids = (data ?? []).map((r: any) => r.carpeta_id as string);
+        idsValidos = idsValidos === null ? ids : idsValidos.filter((id) => ids.includes(id));
+      }
+    }
+
+    const sinResultados = idsValidos !== null && idsValidos.length === 0;
+
+    // Propias
+    let propias: any[] = [];
+    if (!sinResultados) {
+      let q = supabase.from("Carpetas")
+        .select("carpeta_id, nombre, user_id, publica, created_at")
+        .eq("user_id", userId);
+      if (idsValidos !== null) q = q.in("carpeta_id", idsValidos);
+      const { data } = await q.order("nombre");
+      propias = data ?? [];
+    }
+
+    // Compartidas
+    let compartidas: any[] = [];
+    if (!sinResultados && sharedIds.length > 0) {
+      let q = supabase.from("Carpetas")
+        .select("carpeta_id, nombre, user_id, publica, created_at")
+        .neq("user_id", userId)
+        .in("carpeta_id", sharedIds);
+      if (idsValidos !== null) q = q.in("carpeta_id", idsValidos);
+      const { data } = await q.order("nombre");
+      compartidas = data ?? [];
+    }
+
+    // Públicas (de otros usuarios)
+    let publicas: any[] = [];
+    if (!sinResultados) {
+      let q = supabase.from("Carpetas")
+        .select("carpeta_id, nombre, user_id, publica, created_at")
+        .neq("user_id", userId)
+        .eq("publica", true)
+        .not("carpeta_id", "in", `(${sharedIds.length > 0 ? sharedIds.join(",") : "null"})`);
+      if (idsValidos !== null) q = q.in("carpeta_id", idsValidos);
+      const { data } = await q.order("nombre").limit(20);
+      publicas = data ?? [];
+    }
+
+    const todas: Carpeta[] = [
+      ...propias.map((c: any) => ({ ...c, _origen: "propia" as const })),
+      ...compartidas.map((c: any) => ({ ...c, _origen: "compartida" as const })),
+      ...publicas.map((c: any) => ({ ...c, _origen: "publica" as const })),
+    ];
+
+    setCarpetas(todas);
+    setLoadingCarpetas(false);
+  }, [userId, categoriaFiltro, etiquetasFiltro]);
+
+  useEffect(() => {
+    if (userId && !queryParam) cargarCarpetas();
+  }, [userId, queryParam, cargarCarpetas]);
+
+  // ── Búsqueda ───────────────────────────────────────────────────────────
+  const buscar = useCallback(async (query: string) => {
     if (!query.trim() || !userId) return;
     setLoading(true);
+    setHasSearched(true);
     const term = query.trim();
-    const resultados: Resultado[] = [];
+    const encontrados: Resultado[] = [];
 
     const { data: permisosData } = await supabase
       .from("Permisos").select("carpeta_id").eq("user_id", userId);
@@ -229,10 +321,10 @@ export default function BuscarPage() {
       }
 
       if (carpetaIdsValidas && carpetaIdsValidas.length > 0) {
-        const { data: carpetas } = await supabase.from("Carpetas")
+        const { data: cs } = await supabase.from("Carpetas")
           .select("carpeta_id, nombre, user_id, publica, created_at")
           .ilike("nombre", `%${term}%`).or(carpetasFilter).in("carpeta_id", carpetaIdsValidas).limit(20);
-        (carpetas ?? []).forEach((c: any) => resultados.push({
+        (cs ?? []).forEach((c: any) => encontrados.push({
           tipo: "carpeta", id: c.carpeta_id, titulo: c.nombre,
           subtitulo: c.user_id === userId ? "Tu carpeta" : sharedIds.includes(c.carpeta_id) ? "Compartida contigo" : "Carpeta pública",
           extra: fmtDate(c.created_at),
@@ -240,12 +332,11 @@ export default function BuscarPage() {
       }
 
       if (recursoIdsValidos && recursoIdsValidos.length > 0) {
-        const { data: recursos } = await supabase.from("Recursos")
+        const { data: rs } = await supabase.from("Recursos")
           .select("recurso_id, nombre, created_at")
           .eq("user_id", userId).ilike("nombre", `%${term}%`).in("recurso_id", recursoIdsValidos).limit(20);
-        (recursos ?? []).forEach((r: any) => resultados.push({
-          tipo: "recurso", id: r.recurso_id, titulo: r.nombre,
-          subtitulo: "Recurso", extra: fmtDate(r.created_at),
+        (rs ?? []).forEach((r: any) => encontrados.push({
+          tipo: "recurso", id: r.recurso_id, titulo: r.nombre, subtitulo: "Recurso", extra: fmtDate(r.created_at),
         }));
       }
 
@@ -260,30 +351,34 @@ export default function BuscarPage() {
           .neq("user_id", userId).or(`nombre.ilike.%${term}%,email.ilike.%${term}%`).limit(10),
       ]);
 
-      (carpetasRes.data ?? []).forEach((c: any) => resultados.push({
+      (carpetasRes.data ?? []).forEach((c: any) => encontrados.push({
         tipo: "carpeta", id: c.carpeta_id, titulo: c.nombre,
         subtitulo: c.user_id === userId ? "Tu carpeta" : sharedIds.includes(c.carpeta_id) ? "Compartida contigo" : "Carpeta pública",
         extra: fmtDate(c.created_at),
       }));
-      (recursosRes.data ?? []).forEach((r: any) => resultados.push({
+      (recursosRes.data ?? []).forEach((r: any) => encontrados.push({
         tipo: "recurso", id: r.recurso_id, titulo: r.nombre, subtitulo: "Recurso", extra: fmtDate(r.created_at),
       }));
-      (categoriasRes.data ?? []).forEach((c: any) => resultados.push({
+      (categoriasRes.data ?? []).forEach((c: any) => encontrados.push({
         tipo: "categoria", id: c.categoria_id, titulo: c.nombre, subtitulo: c.descripcion || "Categoría",
       }));
-      (usuariosRes.data ?? []).forEach((u: any) => resultados.push({
+      (usuariosRes.data ?? []).forEach((u: any) => encontrados.push({
         tipo: "usuario", id: u.user_id, titulo: u.nombre, subtitulo: u.email, extra: `Miembro desde ${fmtDate(u.created_at)}`,
       }));
     }
 
-    setResultados(resultados);
+    setResultados(encontrados);
     setLoading(false);
-  }, [query, userId, categoriaFiltro, etiquetasFiltro]);
+  }, [userId, categoriaFiltro, etiquetasFiltro]);
 
-  useEffect(() => { if (userId) buscar(); }, [userId, buscar]);
+  // Ejecutar búsqueda cuando llega query por URL o cuando cambian los filtros avanzados
+  useEffect(() => { if (userId && queryParam) buscar(queryParam); }, [userId, queryParam, buscar]);
 
+  // Re-lanzar búsqueda al cambiar filtros avanzados (categoría o etiquetas) si hay query activo
   useEffect(() => {
-    if (categoriaFiltro || etiquetasFiltro.length > 0) setFiltro("todos");
+    if (userId && queryParam) buscar(queryParam);
+    setFiltro("todos");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoriaFiltro, etiquetasFiltro]);
 
   function handleClick(r: Resultado) {
@@ -291,10 +386,28 @@ export default function BuscarPage() {
     else router.push(`/?highlight=${r.id}`);
   }
 
+  function handleCarpetaClick(c: Carpeta) {
+    router.push(`/?highlight=${c.carpeta_id}`);
+  }
+
   function toggleEtiquetaFiltro(id: string) {
     setEtiquetasFiltro((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!inputQuery.trim()) return;
+    router.push(`/buscar?q=${encodeURIComponent(inputQuery.trim())}`);
+  }
+
+  function handleClear() {
+    setInputQuery("");
+    setResultados([]);
+    setHasSearched(false);
+    router.push("/buscar");
+    cargarCarpetas();
   }
 
   const hayFiltroAvanzado = !!categoriaFiltro || etiquetasFiltro.length > 0;
@@ -306,22 +419,49 @@ export default function BuscarPage() {
   const conteos: Record<string, number> = { todos: resultados.length };
   tiposDisponibles.slice(1).forEach((t) => { conteos[t] = resultados.filter((r) => r.tipo === t).length; });
 
+  const modoResultados = !!queryParam;
+
+  // Agrupar carpetas por origen
+  const carpetasPropias = carpetas.filter((c) => c._origen === "propia");
+  const carpetasCompartidas = carpetas.filter((c) => c._origen === "compartida");
+  const carpetasPublicas = carpetas.filter((c) => c._origen === "publica");
+
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
+      {/* ── Header de la página ── */}
+      <div className={styles.pageHeader}>
         <button className={styles.btnBack} onClick={() => router.back()}>← Volver</button>
-        <div className={styles.headerInfo}>
-          <h1 className={styles.title}>
-            {loading ? "Buscando…" : `${resultados.length} resultado${resultados.length !== 1 ? "s" : ""} para`}
-            {!loading && <span className={styles.query}> "{query}"</span>}
+        <div className={styles.pageHeaderInfo}>
+          <h1 className={styles.pageTitle}>
+            {modoResultados ? "Resultados de búsqueda" : "Explorar"}
           </h1>
         </div>
       </div>
 
-      {/* Barra de filtros */}
+      {/* ── Barra de búsqueda ── */}
+      <form className={styles.searchBar} onSubmit={handleSearch}>
+        <div className={styles.searchInputWrapper}>
+          <span className={styles.searchIcon}>🔍</span>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Buscar carpetas, recursos, categorías, usuarios…"
+            value={inputQuery}
+            onChange={(e) => setInputQuery(e.target.value)}
+            autoFocus
+          />
+          {inputQuery && (
+            <button type="button" className={styles.searchClear} onClick={handleClear}>×</button>
+          )}
+        </div>
+        <button type="submit" className={styles.searchSubmit} disabled={!inputQuery.trim()}>
+          Buscar
+        </button>
+      </form>
+
+      {/* ── Filtros (siempre visibles) ── */}
       <div className={styles.filtros}>
-        {/* Filtros de tipo */}
-        {tiposDisponibles.map((t) => (
+        {modoResultados && tiposDisponibles.map((t) => (
           <button key={t}
             className={`${styles.filtroBtn} ${filtro === t ? styles.filtroBtnActive : ""}`}
             onClick={() => setFiltro(t)}>
@@ -330,12 +470,12 @@ export default function BuscarPage() {
           </button>
         ))}
 
-        {/* Separador */}
-        {(categorias.length > 0 || etiquetas.length > 0) && (
+        {(categorias.length > 0 || etiquetas.length > 0) && modoResultados && (
           <span style={{ width: 1, background: "var(--border)", alignSelf: "stretch", margin: "0 4px" }} />
         )}
 
-        {/* Desplegable de categorías */}
+        {/* Filtros avanzados: siempre visibles, funcionan en exploración y en resultados */}
+
         {categorias.length > 0 && (
           <select
             className={`${styles.filtroBtn} ${categoriaFiltro ? styles.filtroBtnActive : ""}`}
@@ -348,7 +488,6 @@ export default function BuscarPage() {
           </select>
         )}
 
-        {/* Dropdown de etiquetas con búsqueda — reemplaza los chips individuales */}
         {etiquetas.length > 0 && (
           <EtiquetasDropdown
             etiquetas={etiquetas}
@@ -358,7 +497,6 @@ export default function BuscarPage() {
           />
         )}
 
-        {/* Limpiar todos los filtros avanzados */}
         {hayFiltroAvanzado && (
           <button className={styles.filtroBtn}
             onClick={() => { setCategoriaFiltro(""); setEtiquetasFiltro([]); }}
@@ -368,32 +506,131 @@ export default function BuscarPage() {
         )}
       </div>
 
-      {/* Resultados */}
-      <div className={styles.resultados}>
-        {loading ? (
-          <div className={styles.loadingDots}><span /><span /><span /></div>
-        ) : filtrados.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>🔍</div>
-            <div>Sin resultados{filtro !== "todos" ? ` en "${filtro}"` : ""}
-              {hayFiltroAvanzado ? " con los filtros aplicados" : ""}
-            </div>
+      {/* ── MODO RESULTADOS ── */}
+      {modoResultados && (
+        <>
+          <div className={styles.resultadosHeader}>
+            <p className={styles.resultadosCount}>
+              {loading ? "Buscando…" : `${resultados.length} resultado${resultados.length !== 1 ? "s" : ""} para`}
+              {!loading && <span className={styles.query}> &quot;{queryParam}&quot;</span>}
+            </p>
           </div>
-        ) : (
-          filtrados.map((r) => (
-            <div key={`${r.tipo}-${r.id}`} className={styles.resultado} onClick={() => handleClick(r)}>
-              <div className={styles.resultadoIcon}>{ICONOS[r.tipo]}</div>
-              <div className={styles.resultadoInfo}>
-                <div className={styles.resultadoTitulo}>{r.titulo}</div>
-                {r.subtitulo && <div className={styles.resultadoSub}>{r.subtitulo}</div>}
-                {r.extra && <div className={styles.resultadoExtra}>{r.extra}</div>}
+
+          <div className={styles.resultados}>
+            {loading ? (
+              <div className={styles.loadingDots}><span /><span /><span /></div>
+            ) : filtrados.length === 0 ? (
+              <div className={styles.empty}>
+                <div className={styles.emptyIcon}>🔍</div>
+                <div>Sin resultados{filtro !== "todos" ? ` en "${filtro}"` : ""}
+                  {hayFiltroAvanzado ? " con los filtros aplicados" : ""}
+                </div>
               </div>
-              <span className={styles.resultadoTipo}>{r.tipo}</span>
-              <span className={styles.resultadoArrow}>→</span>
+            ) : (
+              filtrados.map((r) => (
+                <div key={`${r.tipo}-${r.id}`} className={styles.resultado} onClick={() => handleClick(r)}>
+                  <div className={styles.resultadoIcon}>{ICONOS[r.tipo]}</div>
+                  <div className={styles.resultadoInfo}>
+                    <div className={styles.resultadoTitulo}>{r.titulo}</div>
+                    {r.subtitulo && <div className={styles.resultadoSub}>{r.subtitulo}</div>}
+                    {r.extra && <div className={styles.resultadoExtra}>{r.extra}</div>}
+                  </div>
+                  <span className={styles.resultadoTipo}>{r.tipo}</span>
+                  <span className={styles.resultadoArrow}>→</span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── MODO EXPLORACIÓN (sin query) ── */}
+      {!modoResultados && (
+        <div className={styles.exploracion}>
+          {loadingCarpetas ? (
+            <div className={styles.loadingDots}><span /><span /><span /></div>
+          ) : carpetas.length === 0 ? (
+            <div className={styles.empty}>
+              <div className={styles.emptyIcon}>📂</div>
+              <div>No tienes carpetas disponibles aún</div>
             </div>
-          ))
-        )}
-      </div>
+          ) : (
+            <>
+              {/* Carpetas propias */}
+              {carpetasPropias.length > 0 && (
+                <section className={styles.carpetaSeccion}>
+                  <h2 className={styles.carpetaSeccionTitulo}>
+                    <span>📁</span> Mis carpetas
+                    <span className={styles.carpetaSeccionCount}>{carpetasPropias.length}</span>
+                  </h2>
+                  <div className={styles.carpetaGrid}>
+                    {carpetasPropias.map((c) => (
+                      <div key={c.carpeta_id} className={styles.carpetaCard} onClick={() => handleCarpetaClick(c)}>
+                        <div className={styles.carpetaCardIcon}>📁</div>
+                        <div className={styles.carpetaCardInfo}>
+                          <div className={styles.carpetaCardNombre}>{c.nombre}</div>
+                          <div className={styles.carpetaCardMeta}>
+                            {c.publica ? "🌐 Pública" : "🔒 Privada"} · {fmtDate(c.created_at)}
+                          </div>
+                        </div>
+                        <span className={styles.carpetaCardArrow}>→</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Carpetas compartidas */}
+              {carpetasCompartidas.length > 0 && (
+                <section className={styles.carpetaSeccion}>
+                  <h2 className={styles.carpetaSeccionTitulo}>
+                    <span>🤝</span> Compartidas conmigo
+                    <span className={styles.carpetaSeccionCount}>{carpetasCompartidas.length}</span>
+                  </h2>
+                  <div className={styles.carpetaGrid}>
+                    {carpetasCompartidas.map((c) => (
+                      <div key={c.carpeta_id} className={`${styles.carpetaCard} ${styles.carpetaCardCompartida}`} onClick={() => handleCarpetaClick(c)}>
+                        <div className={styles.carpetaCardIcon}>📁</div>
+                        <div className={styles.carpetaCardInfo}>
+                          <div className={styles.carpetaCardNombre}>{c.nombre}</div>
+                          <div className={styles.carpetaCardMeta}>
+                            🤝 Compartida · {fmtDate(c.created_at)}
+                          </div>
+                        </div>
+                        <span className={styles.carpetaCardArrow}>→</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Carpetas públicas */}
+              {carpetasPublicas.length > 0 && (
+                <section className={styles.carpetaSeccion}>
+                  <h2 className={styles.carpetaSeccionTitulo}>
+                    <span>🌐</span> Carpetas públicas
+                    <span className={styles.carpetaSeccionCount}>{carpetasPublicas.length}</span>
+                  </h2>
+                  <div className={styles.carpetaGrid}>
+                    {carpetasPublicas.map((c) => (
+                      <div key={c.carpeta_id} className={`${styles.carpetaCard} ${styles.carpetaCardPublica}`} onClick={() => handleCarpetaClick(c)}>
+                        <div className={styles.carpetaCardIcon}>📁</div>
+                        <div className={styles.carpetaCardInfo}>
+                          <div className={styles.carpetaCardNombre}>{c.nombre}</div>
+                          <div className={styles.carpetaCardMeta}>
+                            🌐 Pública · {fmtDate(c.created_at)}
+                          </div>
+                        </div>
+                        <span className={styles.carpetaCardArrow}>→</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

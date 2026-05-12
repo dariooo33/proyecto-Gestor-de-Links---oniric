@@ -1,5 +1,5 @@
 .page {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 36px 28px;
   font-family: var(--font-body);
@@ -7,12 +7,22 @@
   min-height: 100vh;
 }
 
-/* ─── Header ─────────────────────────────────────────────────────────────── */
-.header {
+/* ─── Page header ─────────────────────────────────────────────────────────── */
+.pageHeader {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.pageHeaderInfo { flex: 1; }
+
+.pageTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .btnBack {
@@ -30,23 +40,83 @@
 }
 .btnBack:hover { background: var(--surface2); color: var(--text); }
 
-.title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
-  margin: 0;
+/* ─── Barra de búsqueda ───────────────────────────────────────────────────── */
+.searchBar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
-.query {
-  color: var(--accent);
+.searchInputWrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
 }
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  font-size: 14px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font-body);
+  padding: 12px 40px 12px 42px;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow, rgba(91,127,255,.12));
+}
+.searchInput::placeholder { color: var(--text-muted); font-size: 14px; }
+
+.searchClear {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color .12s, background .12s;
+}
+.searchClear:hover { color: var(--text); background: var(--surface2); }
+
+.searchSubmit {
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  padding: 12px 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity .15s, transform .15s;
+}
+.searchSubmit:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.searchSubmit:disabled { opacity: 0.35; cursor: default; }
 
 /* ─── Filtros ────────────────────────────────────────────────────────────── */
 .filtros {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .filtroBtn {
@@ -62,6 +132,8 @@
   padding: 5px 12px;
   cursor: pointer;
   transition: all .15s;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .filtroBtn:hover { border-color: var(--accent); color: var(--text); }
 .filtroBtnActive {
@@ -82,6 +154,17 @@
   background: rgba(91,127,255,.2);
   color: var(--accent);
 }
+
+/* ─── Resultados header ───────────────────────────────────────────────────── */
+.resultadosHeader { margin-bottom: 12px; }
+
+.resultadosCount {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.query { color: var(--accent); font-weight: 500; }
 
 /* ─── Resultados ─────────────────────────────────────────────────────────── */
 .resultados {
@@ -117,22 +200,9 @@
   min-width: 0;
 }
 
-.resultadoTitulo {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-}
-
-.resultadoSub {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.resultadoExtra {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-}
+.resultadoTitulo { font-size: 15px; font-weight: 500; color: var(--text); }
+.resultadoSub { font-size: 12px; color: var(--text-muted); }
+.resultadoExtra { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
 
 .resultadoTipo {
   font-size: 10px;
@@ -152,7 +222,113 @@
   flex-shrink: 0;
   transition: color .15s, transform .15s;
 }
-.resultado:hover .resultadoArrow {
+.resultado:hover .resultadoArrow { color: var(--accent); transform: translateX(3px); }
+
+/* ─── Sección de exploración (modo sin query) ─────────────────────────────── */
+.exploracion {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.carpetaSeccion {}
+
+.carpetaSeccionTitulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+}
+
+.carpetaSeccionCount {
+  background: var(--surface2);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  color: var(--text-muted);
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 2px;
+}
+
+.carpetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.carpetaCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, box-shadow .15s, transform .15s;
+}
+.carpetaCard:hover {
+  border-color: var(--accent);
+  background: var(--surface2);
+  box-shadow: 0 2px 12px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.carpetaCardCompartida {
+  border-left: 3px solid rgba(91, 200, 127, 0.4);
+}
+.carpetaCardCompartida:hover {
+  border-left-color: rgba(91, 200, 127, 0.8);
+}
+
+.carpetaCardPublica {
+  border-left: 3px solid rgba(91, 150, 255, 0.3);
+}
+.carpetaCardPublica:hover {
+  border-left-color: rgba(91, 150, 255, 0.7);
+}
+
+.carpetaCardIcon { font-size: 22px; flex-shrink: 0; }
+
+.carpetaCardInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.carpetaCardNombre {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.carpetaCardMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.carpetaCardArrow {
+  color: var(--text-muted);
+  font-size: 15px;
+  flex-shrink: 0;
+  transition: color .15s, transform .15s;
+}
+.carpetaCard:hover .carpetaCardArrow {
   color: var(--accent);
   transform: translateX(3px);
 }
@@ -188,29 +364,21 @@
 }
 .emptyIcon { font-size: 48px; opacity: .4; }
 
-
-
-.filtroBtn select,
-select.filtroBtn {
-  appearance: none;
-  -webkit-appearance: none;
- /* background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23636680'/%3E%3C/svg%3E");*/
- background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
-  cursor: pointer;
-}
-
-
-/* Lista scrolleable dentro del EtiquetasPicker (modales) */
-.etiquetaListBox {
-  max-height: 160px;
-  overflow-y: auto;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 6px;
-  margin-top: 4px;
+/* ─── Dropdown de etiquetas ──────────────────────────────────────────────── */
+.etiquetasDropdownPanel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  min-width: 220px;
   background: var(--bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  overflow: hidden;
 }
+
+.etiquetasDropdownList { max-height: 200px; overflow-y: auto; }
 
 .etiquetaListItem {
   display: flex;
@@ -226,40 +394,28 @@ select.filtroBtn {
   color: inherit;
   transition: background 0.12s;
 }
-.etiquetaListItem:hover {
-  background: var(--hover, #f3f4f6);
-}
-.etiquetaListItemOn {
-  background: var(--primary-light, #ede9fe);
-  font-weight: 500;
-}
-.etiquetaListItemOn:hover {
-  background: var(--primary-light-hover, #ddd6fe);
-}
+.etiquetaListItem:hover { background: var(--hover, #f3f4f6); }
+.etiquetaListItemOn { background: var(--primary-light, #ede9fe); font-weight: 500; }
+.etiquetaListItemOn:hover { background: var(--primary-light-hover, #ddd6fe); }
+.etiquetaListCheck { width: 14px; font-size: 11px; color: var(--color-primary, #6366f1); flex-shrink: 0; }
 
-.etiquetaListCheck {
-  width: 14px;
-  font-size: 11px;
-  color: var(--color-primary, #6366f1);
-  flex-shrink: 0;
-}
-
-/* ── Dropdown de etiquetas en la página de búsqueda ─────────────────────── */
-
-.etiquetasDropdownPanel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 100;
-  min-width: 220px;
-  background: var(--bg, #fff);
+.modalInput {
+  width: 100%;
   border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-  overflow: hidden;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  outline: none;
+  font-family: var(--font-body);
 }
+.modalInput:focus { border-color: var(--accent); }
 
-.etiquetasDropdownList {
-  max-height: 200px;
-  overflow-y: auto;
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .page { padding: 20px 16px; }
+  .searchBar { flex-direction: column; }
+  .searchSubmit { width: 100%; text-align: center; }
+  .carpetaGrid { grid-template-columns: 1fr; }
 }

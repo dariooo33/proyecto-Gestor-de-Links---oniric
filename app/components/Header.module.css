@@ -50,7 +50,7 @@
   transform: scale(1.06);
 }
 
-/* ─── CENTRO — Buscador desktop ───────────────────────────────────────────── */
+/* ─── CENTRO — Botón búsqueda desktop ────────────────────────────────────── */
 .centro {
   flex: 1;
   display: flex;
@@ -67,125 +67,55 @@
   padding: 6px 0 8px;
 }
 
-.searchWrapper {
-  position: relative;
+/* ─── Botón de búsqueda (reemplaza el input) ──────────────────────────────── */
+.searchBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   max-width: 480px;
-}
-
-.searchInput {
-  width: 100%;
   background: rgba(255,255,255,.04);
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 6px;
-  color: var(--text);
+  color: rgba(255,255,255,.3);
   font-size: 13px;
   font-family: var(--font-body);
-  padding: 8px 34px 8px 14px;
-  outline: none;
-  transition: border-color .18s, box-shadow .18s, background .18s;
+  padding: 8px 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color .18s, box-shadow .18s, background .18s, color .18s;
 }
 
-.searchInput:focus {
+.searchBtn:hover {
   background: rgba(245,166,35,.04);
   border-color: rgba(245,166,35,.4);
   box-shadow: 0 0 0 3px rgba(245,166,35,.08);
+  color: rgba(255,255,255,.5);
 }
 
-.searchInput::placeholder {
-  color: rgba(255,255,255,.2);
-  font-size: 12px;
-}
-
-.searchSpinner {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--accent);
-  font-size: 14px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
-
-.searchDropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: #0f0f0f;
-  border: 1px solid #222;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0,0,0,.7);
-  z-index: 200;
-  overflow: hidden;
-  animation: fadeDown .14s ease;
-}
-
-@keyframes fadeDown {
-  from { opacity: 0; transform: translateY(-5px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.searchResult {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  cursor: pointer;
-  transition: background .12s;
-  border-bottom: 1px solid #1a1a1a;
-}
-
-.searchResult:last-child { border-bottom: none; }
-.searchResult:hover { background: rgba(245,166,35,.06); }
-
-.searchResultIcon { font-size: 15px; flex-shrink: 0; }
-
-.searchResultInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.searchResultTitulo {
+.searchBtnIcon {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.searchBtnText {
+  flex: 1;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.searchResultSub {
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.searchResultTipo {
+.searchBtnKbd {
   font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--accent);
-  background: rgba(245,166,35,.1);
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
   border-radius: 4px;
   padding: 2px 6px;
+  color: rgba(255,255,255,.25);
+  font-family: var(--font-mono);
   flex-shrink: 0;
-}
-
-.searchEmpty {
-  padding: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-muted);
-  font-style: italic;
 }
 
 /* ─── DERECHA — Nav links desktop ────────────────────────────────────────── */
@@ -346,6 +276,11 @@
   padding: 8px 0 12px;
   border-top: 1px solid #1a1a1a;
   animation: fadeDown .18s ease;
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .mobileLink {
