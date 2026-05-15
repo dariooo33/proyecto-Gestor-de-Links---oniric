@@ -62,6 +62,8 @@ export default function Header() {
           {/* Links derecha — desktop */}
           <div className={`${styles.derecha} ${styles.derechaDesktop}`}>
             <li><a href="/">MENU</a></li>
+            <li><a href="/categorias">CATEGORÍAS</a></li>
+            <li><a href="/etiquetas">ETIQUETAS</a></li>
             {usuario === undefined ? (
               <li className={styles.cargando}>...</li>
             ) : usuario ? (
@@ -107,6 +109,8 @@ export default function Header() {
           <div className={styles.mobileMenu}>
             <a href="/" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>MENU</a>
             <a href="/buscar" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>🔍 Buscar</a>
+            <a href="/categorias" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>🏷️ Categorías</a>
+            <a href="/etiquetas" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>🔖 Etiquetas</a>
             {usuario === undefined ? null : usuario ? (
               <>
                 {usuario.rol === "admin" && (
