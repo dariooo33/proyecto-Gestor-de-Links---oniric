@@ -102,6 +102,7 @@ export function CenterPanel({
   carpeta, subCarpetas, recursos, loading, userId, nivelAcceso,
   onSelectCarpeta, onNewRecurso, onDeleteRecurso, onDeleteCarpeta,
   onOpenPermisos, onLeaveShared, onTogglePublica, onSetCategoria, onSetEtiquetas,
+  onRenameRecurso, onRenameCarpeta,
 }: {
   carpeta: Carpeta | null;
   subCarpetas: Carpeta[];
@@ -118,10 +119,20 @@ export function CenterPanel({
   onTogglePublica: (carpetaId: string, publica: boolean) => Promise<void>;
   onSetCategoria: (carpetaId: string, categoriaId: string | null) => Promise<void>;
   onSetEtiquetas: (carpetaId: string | null, recursoId: string | null, etiquetaIds: string[]) => Promise<void>;
+  onRenameRecurso?: (recursoId: string, nuevoNombre: string) => void;
+  onRenameCarpeta?: (carpetaId: string, nuevoNombre: string) => void;
 }) {
   const [selectedRecurso, setSelectedRecurso] = useState<Recurso | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Edición inline de nombres
+  const [editingRecursoId, setEditingRecursoId] = useState<string | null>(null);
+  const [editingRecursoNombre, setEditingRecursoNombre] = useState("");
+  const [editingCarpetaId, setEditingCarpetaId] = useState<string | null>(null);
+  const [editingCarpetaNombre, setEditingCarpetaNombre] = useState("");
+  const recursoInputRef = useRef<HTMLInputElement>(null);
+  const carpetaInputRef = useRef<HTMLInputElement>(null);
 
   // Filtros locales
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -301,6 +312,43 @@ export function CenterPanel({
     setTodasEtiquetas((prev) => [...prev, e].sort((a, b) => a.nombre.localeCompare(b.nombre)));
   }
 
+  // ── Edición inline de recursos ────────────────────────────────────────────
+  function startEditRecurso(r: Recurso) {
+    if (!canEdit) return;
+    setEditingRecursoId(r.recurso_id);
+    setEditingRecursoNombre(r.nombre);
+    setTimeout(() => recursoInputRef.current?.select(), 30);
+  }
+
+  async function commitEditRecurso(recursoId: string, nombre: string, original: string) {
+    setEditingRecursoId(null);
+    const trimmed = nombre.trim();
+    if (!trimmed || trimmed === original) return;
+    await supabase.from("Recursos").update({ nombre: trimmed }).eq("recurso_id", recursoId);
+    // Forzar refresco: actualizar el recurso seleccionado si coincide
+    if (selectedRecurso?.recurso_id === recursoId) {
+      setSelectedRecurso((prev) => prev ? { ...prev, nombre: trimmed } : prev);
+    }
+    // Notificar al padre para que recargue recursos
+    onRenameRecurso?.(recursoId, trimmed);
+  }
+
+  // ── Edición inline de subcarpetas ─────────────────────────────────────────
+  function startEditCarpeta(c: Carpeta) {
+    if (!canEdit) return;
+    setEditingCarpetaId(c.carpeta_id);
+    setEditingCarpetaNombre(c.nombre);
+    setTimeout(() => carpetaInputRef.current?.select(), 30);
+  }
+
+  async function commitEditCarpeta(carpetaId: string, nombre: string, original: string) {
+    setEditingCarpetaId(null);
+    const trimmed = nombre.trim();
+    if (!trimmed || trimmed === original) return;
+    await supabase.from("Carpetas").update({ nombre: trimmed }).eq("carpeta_id", carpetaId);
+    onRenameCarpeta?.(carpetaId, trimmed);
+  }
+
   if (!carpeta) {
     return (
       <div className={styles.emptyState}>
@@ -467,9 +515,28 @@ export function CenterPanel({
           <div className={styles.sectionTitle}>Subcarpetas</div>
           <div className={styles.folderGrid}>
             {subCarpetasFiltradas.map((sc) => (
-              <div key={sc.carpeta_id} className={styles.folderCard} onClick={() => onSelectCarpeta(sc.carpeta_id)}>
+              <div key={sc.carpeta_id} className={styles.folderCard} onClick={() => { if (editingCarpetaId !== sc.carpeta_id) onSelectCarpeta(sc.carpeta_id); }}>
                 <div className={styles.folderCardIcon}>{sc.publica ? "🌐" : "📁"}</div>
-                <div className={styles.folderCardName}>{sc.nombre}</div>
+                {editingCarpetaId === sc.carpeta_id ? (
+                  <input
+                    ref={carpetaInputRef}
+                    className={styles.inlineEditInput}
+                    value={editingCarpetaNombre}
+                    onChange={(e) => setEditingCarpetaNombre(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitEditCarpeta(sc.carpeta_id, editingCarpetaNombre, sc.nombre);
+                      if (e.key === "Escape") setEditingCarpetaId(null);
+                    }}
+                    onBlur={() => commitEditCarpeta(sc.carpeta_id, editingCarpetaNombre, sc.nombre)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <div
+                    className={styles.folderCardName}
+                    onDoubleClick={(e) => { e.stopPropagation(); startEditCarpeta(sc); }}
+                    title={canEdit ? "Doble clic para renombrar" : undefined}
+                  >{sc.nombre}</div>
+                )}
                 <div className={styles.folderCardMeta}>Creada {fmtDate(sc.created_at)}</div>
               </div>
             ))}
@@ -493,18 +560,38 @@ export function CenterPanel({
                     onClick={() => setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r)}>
                     <span className={styles.resourceIcon}>📄</span>
                     <span className={styles.resourceName}>
-                      {r.url ? (
+                      {editingRecursoId === r.recurso_id ? (
+                        <input
+                          ref={recursoInputRef}
+                          className={styles.inlineEditInput}
+                          value={editingRecursoNombre}
+                          onChange={(e) => setEditingRecursoNombre(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEditRecurso(r.recurso_id, editingRecursoNombre, r.nombre);
+                            if (e.key === "Escape") setEditingRecursoId(null);
+                          }}
+                          onBlur={() => commitEditRecurso(r.recurso_id, editingRecursoNombre, r.nombre)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : r.url ? (
                         <a
                           href={r.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={styles.resourceLink}
                           onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); startEditRecurso(r); }}
+                          title={canEdit ? "Doble clic para renombrar" : undefined}
                         >
                           {r.nombre}
                         </a>
                       ) : (
-                        r.nombre
+                        <span
+                          onDoubleClick={(e) => { e.stopPropagation(); startEditRecurso(r); }}
+                          title={canEdit ? "Doble clic para renombrar" : undefined}
+                        >
+                          {r.nombre}
+                        </span>
                       )}
                     </span>
                     {r.url && (

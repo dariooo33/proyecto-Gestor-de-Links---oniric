@@ -229,7 +229,7 @@ if (etiquetaIds.length > 0) {
     await loadCarpetas();
   }
 
-  async function handleMoveCarpeta(draggedId: string, targetId: string) {
+  async function handleMoveCarpeta(draggedId: string, targetId: string | null) {
     if (draggedId === targetId) return;
 
     const esDescendiente = (posibleHijoId: string, raizId: string): boolean => {
@@ -239,7 +239,7 @@ if (etiquetaIds.length > 0) {
       );
     };
 
-    if (esDescendiente(targetId, draggedId)) {
+    if (targetId && esDescendiente(targetId, draggedId)) {
       setError("No puedes mover una carpeta dentro de una de sus subcarpetas.");
       return;
     }
@@ -250,7 +250,7 @@ if (etiquetaIds.length > 0) {
       .eq("carpeta_id", draggedId);
     if (error) { setError(error.message); return; }
 
-    setExpandedIds((prev) => new Set([...prev, targetId]));
+    if (targetId) setExpandedIds((prev) => new Set([...prev, targetId]));
     await loadCarpetas();
   }
 
@@ -424,6 +424,13 @@ if (etiquetaIds.length > 0) {
             onTogglePublica={handleTogglePublica}
             onSetCategoria={handleSetCategoria}
             onSetEtiquetas={handleSetEtiquetas}
+            onRenameRecurso={(recursoId, nuevoNombre) => {
+              setSidebarRefreshTrigger((n) => n + 1);
+              loadRecursos(selectedId!);
+            }}
+            onRenameCarpeta={(carpetaId, nuevoNombre) => {
+              loadCarpetas();
+            }}
           />
         </div>
       </main>

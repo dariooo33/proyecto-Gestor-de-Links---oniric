@@ -454,7 +454,7 @@ export function SidebarTree({
   onToggle: (id: string) => void;
   onDelete: (id: string, nombre: string) => void;
   onRename: (id: string, nuevoNombre: string) => Promise<void>;
-  onMove: (draggedId: string, targetId: string) => Promise<void>;
+  onMove: (draggedId: string, targetId: string | null) => Promise<void>;
   onNewFolder: (parentId: string | null) => void;
   onNewResource: (parentId: string) => void;
   onOpenPermisos: (node: TreeNode) => void;
@@ -470,6 +470,7 @@ export function SidebarTree({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  const [dragOverRoot, setDragOverRoot] = useState(false);
   const [showRecursos, setShowRecursos] = useState(false);
   const [recursos, setRecursos] = useState<Record<string, Recurso[]>>({});
   const [renamingRecursoId, setRenamingRecursoId] = useState<string | null>(null);
@@ -566,7 +567,7 @@ export function SidebarTree({
     if (id !== draggingId) setDragOverId(id);
   }
 
-  const handleDrop = useCallback(async (targetId: string) => {
+  const handleDrop = useCallback(async (targetId: string | null) => {
     if (draggingId && draggingId !== targetId) {
       await onMove(draggingId, targetId);
     }
@@ -646,6 +647,31 @@ export function SidebarTree({
           onRecursoDrop={handleRecursoDrop}
         />
       ))}
+
+      {/* ── Zona de soltar en raíz ──────────────────────────────────────── */}
+      {(draggingId || draggingRecursoId) && (
+        <div
+          className={[
+            styles.dropRootZone,
+            dragOverRoot ? styles.dropRootZoneOver : "",
+          ].filter(Boolean).join(" ")}
+          onDragOver={(e) => { e.preventDefault(); setDragOverRoot(true); }}
+          onDragLeave={() => setDragOverRoot(false)}
+          onDrop={async (e) => {
+            e.preventDefault();
+            setDragOverRoot(false);
+            const tipo = e.dataTransfer.getData("tipo");
+            if (tipo === "recurso") {
+              // Los recursos necesitan estar en una carpeta; no aplica mover a raíz
+            } else {
+              await handleDrop(null);
+            }
+          }}
+        >
+          <span className={styles.dropRootIcon}>📂</span>
+          <span>Mover a raíz</span>
+        </div>
+      )}
 
       {contextMenu && (
         <ContextMenu

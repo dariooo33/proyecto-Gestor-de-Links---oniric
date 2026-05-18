@@ -468,6 +468,21 @@
   font-size: 13px;
 }
 
+.inlineEditInput {
+  flex: 1;
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1.5px solid var(--accent);
+  border-radius: 5px;
+  padding: 2px 7px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  min-width: 0;
+}
+
 .resourceLink:hover {
   text-decoration: underline;
 }
@@ -1547,4 +1562,32 @@
   }
 
   .btnPrimary { font-size: 12px; padding: 5px 10px; }
+}
+
+/* ── Zona de soltar en raíz ──────────────────────────────────────────────── */
+.dropRootZone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px dashed var(--border);
+  color: var(--text3);
+  font-size: 12px;
+  cursor: default;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+
+.dropRootZoneOver {
+  background: var(--accent-dim) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  border-style: solid;
+}
+
+.dropRootIcon {
+  font-size: 14px;
+  line-height: 1;
 }
