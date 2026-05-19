@@ -131,7 +131,14 @@ export function CenterPanel({
   const [editingRecursoNombre, setEditingRecursoNombre] = useState("");
   const [editingCarpetaId, setEditingCarpetaId] = useState<string | null>(null);
   const [editingCarpetaNombre, setEditingCarpetaNombre] = useState("");
-  const recursoInputRef = useRef<HTMLInputElement>(null);
+  const [editingRecursoFull, setEditingRecursoFull] = useState(false);
+  const [editFullNombre, setEditFullNombre] = useState("");
+  const [editFullUrl, setEditFullUrl] = useState("");
+  const [editFullContenido, setEditFullContenido] = useState("");
+  const [savingRecursoFull, setSavingRecursoFull] = useState(false);
+  const [editingHeaderCarpeta, setEditingHeaderCarpeta] = useState(false);
+  const [editHeaderNombre, setEditHeaderNombre] = useState("");
+
   const carpetaInputRef = useRef<HTMLInputElement>(null);
 
   // Filtros locales
@@ -317,7 +324,6 @@ export function CenterPanel({
     if (!canEdit) return;
     setEditingRecursoId(r.recurso_id);
     setEditingRecursoNombre(r.nombre);
-    setTimeout(() => recursoInputRef.current?.select(), 30);
   }
 
   async function commitEditRecurso(recursoId: string, nombre: string, original: string) {
@@ -331,6 +337,50 @@ export function CenterPanel({
     }
     // Notificar al padre para que recargue recursos
     onRenameRecurso?.(recursoId, trimmed);
+  }
+
+  // ── Edición completa del recurso (panel detalle) ──────────────────────────
+  function startEditRecursoFull() {
+    if (!selectedRecurso || !canEdit) return;
+    setEditFullNombre(selectedRecurso.nombre);
+    setEditFullUrl(selectedRecurso.url ?? "");
+    setEditFullContenido(selectedRecurso.contenido ?? "");
+    setEditingRecursoFull(true);
+  }
+
+  async function commitEditRecursoFull() {
+    if (!selectedRecurso) return;
+    setSavingRecursoFull(true);
+    const trimmed = editFullNombre.trim();
+    if (!trimmed) { setSavingRecursoFull(false); return; }
+    const updates: Record<string, string> = {
+      nombre: trimmed,
+      contenido: editFullContenido,
+    };
+    if (editFullUrl.trim()) updates.url = editFullUrl.trim();
+    else updates.url = "";
+    await supabase.from("Recursos").update(updates).eq("recurso_id", selectedRecurso.recurso_id);
+    const updated = { ...selectedRecurso, nombre: trimmed, contenido: editFullContenido, url: editFullUrl.trim() || null };
+    setSelectedRecurso(updated);
+    setEditingRecursoFull(false);
+    setSavingRecursoFull(false);
+    onRenameRecurso?.(selectedRecurso.recurso_id, trimmed);
+  }
+
+  // ── Edición del nombre de la carpeta actual (header) ──────────────────────
+  function startEditHeaderCarpeta() {
+    if (!carpeta || !canEdit) return;
+    setEditHeaderNombre(carpeta.nombre);
+    setEditingHeaderCarpeta(true);
+  }
+
+  async function commitEditHeaderCarpeta() {
+    if (!carpeta) return;
+    const trimmed = editHeaderNombre.trim();
+    setEditingHeaderCarpeta(false);
+    if (!trimmed || trimmed === carpeta.nombre) return;
+    await supabase.from("Carpetas").update({ nombre: trimmed }).eq("carpeta_id", carpeta.carpeta_id);
+    onRenameCarpeta?.(carpeta.carpeta_id, trimmed);
   }
 
   // ── Edición inline de subcarpetas ─────────────────────────────────────────
@@ -378,7 +428,27 @@ export function CenterPanel({
         <div className={styles.folderHeaderIcon}>📂</div>
         <div className={styles.folderHeaderInfo}>
           <div className={styles.folderHeaderName}>
-            {carpeta.nombre}
+            {editingHeaderCarpeta ? (
+              <input
+                autoFocus
+                className={styles.inlineEditInput}
+                value={editHeaderNombre}
+                style={{ fontSize: "inherit", fontWeight: "inherit", maxWidth: 300 }}
+                onChange={(e) => setEditHeaderNombre(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitEditHeaderCarpeta();
+                  if (e.key === "Escape") setEditingHeaderCarpeta(false);
+                }}
+                onBlur={commitEditHeaderCarpeta}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span
+                onDoubleClick={startEditHeaderCarpeta}
+                title={canEdit ? "Doble clic para renombrar" : undefined}
+                style={{ cursor: canEdit ? "text" : "default" }}
+              >{carpeta.nombre}</span>
+            )}
             {carpeta.publica && <span className={styles.publicaBadge}>🌐 Pública</span>}
             {!carpeta.publica && <span className={styles.privadaBadge}>🔒 Privada</span>}
             {nivelAcceso === "lectura" && <span className={styles.nivelBadge} data-nivel="lectura">👁 Solo lectura</span>}
@@ -557,12 +627,16 @@ export function CenterPanel({
               return (
                 <div key={r.recurso_id}>
                   <div className={styles.resourceRow}
-                    onClick={() => setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r)}>
+                    onClick={() => { if (editingRecursoId === r.recurso_id) return; setSelectedRecurso(selectedRecurso?.recurso_id === r.recurso_id ? null : r); }}>
                     <span className={styles.resourceIcon}>📄</span>
-                    <span className={styles.resourceName}>
+                    <span
+                      className={styles.resourceName}
+                      onDoubleClick={(e) => { e.stopPropagation(); startEditRecurso(r); }}
+                      title={canEdit ? "Doble clic para renombrar" : undefined}
+                    >
                       {editingRecursoId === r.recurso_id ? (
                         <input
-                          ref={recursoInputRef}
+                          autoFocus
                           className={styles.inlineEditInput}
                           value={editingRecursoNombre}
                           onChange={(e) => setEditingRecursoNombre(e.target.value)}
@@ -572,6 +646,7 @@ export function CenterPanel({
                           }}
                           onBlur={() => commitEditRecurso(r.recurso_id, editingRecursoNombre, r.nombre)}
                           onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
                         />
                       ) : r.url ? (
                         <a
@@ -580,18 +655,12 @@ export function CenterPanel({
                           rel="noopener noreferrer"
                           className={styles.resourceLink}
                           onClick={(e) => e.stopPropagation()}
-                          onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); startEditRecurso(r); }}
-                          title={canEdit ? "Doble clic para renombrar" : undefined}
+                          title={r.url}
                         >
                           {r.nombre}
                         </a>
                       ) : (
-                        <span
-                          onDoubleClick={(e) => { e.stopPropagation(); startEditRecurso(r); }}
-                          title={canEdit ? "Doble clic para renombrar" : undefined}
-                        >
-                          {r.nombre}
-                        </span>
+                        <span>{r.nombre}</span>
                       )}
                     </span>
                     {r.url && (
@@ -654,20 +723,70 @@ export function CenterPanel({
           <div className={styles.resourceDetail}>
             <div className={styles.resourceDetailHeader}>
               <span className={styles.resourceDetailIcon}>📄</span>
-              <div>
-                <div className={styles.resourceDetailName}>{selectedRecurso.nombre}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editingRecursoFull ? (
+                  <input
+                    autoFocus
+                    className={styles.inlineEditInput}
+                    value={editFullNombre}
+                    style={{ fontSize: 15, fontWeight: 600, width: "100%" }}
+                    onChange={(e) => setEditFullNombre(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Escape") setEditingRecursoFull(false); }}
+                    placeholder="Nombre del recurso"
+                  />
+                ) : (
+                  <div className={styles.resourceDetailName}>{selectedRecurso.nombre}</div>
+                )}
                 <div className={styles.resourceDetailMeta}>Creado {fmtDate(selectedRecurso.created_at)}</div>
               </div>
+              {canEdit && !editingRecursoFull && (
+                <button className={styles.btnIconSm} onClick={startEditRecursoFull} title="Editar recurso">✏️</button>
+              )}
+              {editingRecursoFull && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className={styles.btnPrimary} style={{ padding: "4px 12px", fontSize: 12 }} onClick={commitEditRecursoFull} disabled={savingRecursoFull}>
+                    {savingRecursoFull ? "…" : "Guardar"}
+                  </button>
+                  <button className={styles.btnSecondary} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setEditingRecursoFull(false)}>Cancelar</button>
+                </div>
+              )}
             </div>
-            <div className={styles.resourceContent}>
-              {selectedRecurso.contenido || <span className={styles.resourceContentEmpty}>Sin contenido</span>}
-            </div>
-            {selectedRecurso.url && (
-              <div className={styles.resourceDetailUrl}>
-                <a href={selectedRecurso.url} target="_blank" rel="noopener noreferrer" className={styles.resourceLink}>
-                  🔗 {selectedRecurso.url}
-                </a>
-              </div>
+            {editingRecursoFull ? (
+              <>
+                <div className={styles.resourceDetailEditField}>
+                  <label className={styles.resourceDetailEditLabel}>URL</label>
+                  <input
+                    className={styles.inlineEditInput}
+                    value={editFullUrl}
+                    onChange={(e) => setEditFullUrl(e.target.value)}
+                    placeholder="https://..."
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div className={styles.resourceDetailEditField}>
+                  <label className={styles.resourceDetailEditLabel}>Contenido</label>
+                  <textarea
+                    className={styles.resourceDetailEditTextarea}
+                    value={editFullContenido}
+                    onChange={(e) => setEditFullContenido(e.target.value)}
+                    placeholder="Notas, descripción..."
+                    rows={5}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.resourceContent}>
+                  {selectedRecurso.contenido || <span className={styles.resourceContentEmpty}>Sin contenido</span>}
+                </div>
+                {selectedRecurso.url && (
+                  <div className={styles.resourceDetailUrl}>
+                    <a href={selectedRecurso.url} target="_blank" rel="noopener noreferrer" className={styles.resourceLink}>
+                      🔗 {selectedRecurso.url}
+                    </a>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
