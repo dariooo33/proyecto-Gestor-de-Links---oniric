@@ -10,6 +10,24 @@ interface Etiqueta {
   nombre: string;
   descripcion?: string;
   created_at: string;
+  user_id: string;
+  color?: string | null;
+}
+
+const COLORES_ETIQUETA = [
+  { id: "green",  label: "Verde",    hex: "#4ecb8d", bg: "rgba(78,203,141,.15)",  border: "rgba(78,203,141,.4)"  },
+  { id: "blue",   label: "Azul",     hex: "#60a5fa", bg: "rgba(96,165,250,.15)",  border: "rgba(96,165,250,.4)"  },
+  { id: "purple", label: "Violeta",  hex: "#a78bfa", bg: "rgba(167,139,250,.15)", border: "rgba(167,139,250,.4)" },
+  { id: "pink",   label: "Rosa",     hex: "#f472b6", bg: "rgba(244,114,182,.15)", border: "rgba(244,114,182,.4)" },
+  { id: "orange", label: "Naranja",  hex: "#fb923c", bg: "rgba(251,146,60,.15)",  border: "rgba(251,146,60,.4)"  },
+  { id: "yellow", label: "Amarillo", hex: "#fbbf24", bg: "rgba(251,191,36,.15)",  border: "rgba(251,191,36,.4)"  },
+  { id: "red",    label: "Rojo",     hex: "#f87171", bg: "rgba(248,113,113,.15)", border: "rgba(248,113,113,.4)" },
+  { id: "cyan",   label: "Cian",     hex: "#22d3ee", bg: "rgba(34,211,238,.15)",  border: "rgba(34,211,238,.4)"  },
+  { id: "gray",   label: "Gris",     hex: "#94a3b8", bg: "rgba(148,163,184,.15)", border: "rgba(148,163,184,.4)" },
+];
+
+function getColorDef(colorId?: string | null) {
+  return COLORES_ETIQUETA.find((c) => c.id === colorId) ?? COLORES_ETIQUETA[0];
 }
 
 interface Carpeta {
@@ -144,11 +162,12 @@ function PanelCarpetas({ etiqueta, userId, onClose }: {
 // ── Modal crear / editar ──────────────────────────────────────────────────
 function ModalForm({ inicial, onGuardar, onCerrar }: {
   inicial?: Partial<Etiqueta>;
-  onGuardar: (nombre: string, descripcion: string) => Promise<void>;
+  onGuardar: (nombre: string, descripcion: string, color: string) => Promise<void>;
   onCerrar: () => void;
 }) {
   const [nombre, setNombre] = useState(inicial?.nombre ?? "");
   const [descripcion, setDescripcion] = useState(inicial?.descripcion ?? "");
+  const [color, setColor] = useState(inicial?.color ?? "green");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -158,9 +177,11 @@ function ModalForm({ inicial, onGuardar, onCerrar }: {
     e.preventDefault();
     if (!nombre.trim()) return;
     setSaving(true);
-    await onGuardar(nombre.trim(), descripcion.trim());
+    await onGuardar(nombre.trim(), descripcion.trim(), color);
     setSaving(false);
   }
+
+  const colorDef = getColorDef(color);
 
   return (
     <div className={styles.overlay} onClick={onCerrar}>
@@ -168,15 +189,44 @@ function ModalForm({ inicial, onGuardar, onCerrar }: {
         <h2 className={styles.modalTitulo}>{inicial?.etiqueta_id ? "Editar etiqueta" : "Nueva etiqueta"}</h2>
         <form onSubmit={handleSubmit} className={styles.form}>
           <label className={styles.label}>Nombre</label>
-          <input
-            ref={inputRef}
-            className={styles.input}
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: urgente, favorito, revisar…"
-            maxLength={60}
-          />
-          <label className={styles.label}>Descripción <span className={styles.opcional}>(opcional)</span></label>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{
+              display: "inline-block", width: 18, height: 18, borderRadius: 5,
+              background: colorDef.bg, border: `2px solid ${colorDef.hex}`, flexShrink: 0
+            }} />
+            <input
+              ref={inputRef}
+              className={styles.input}
+              style={{ flex: 1, borderColor: colorDef.hex }}
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej: urgente, favorito, revisar…"
+              maxLength={60}
+            />
+          </div>
+          <label className={styles.label} style={{ marginTop: 14 }}>Color</label>
+          <div className={styles.colorPicker}>
+            {COLORES_ETIQUETA.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={styles.colorSwatch}
+                style={{
+                  background: c.bg,
+                  border: `2px solid ${color === c.id ? c.hex : "transparent"}`,
+                  boxShadow: color === c.id ? `0 0 0 2px ${c.hex}44` : "none",
+                }}
+                title={c.label}
+                onClick={() => setColor(c.id)}
+              >
+                <span style={{
+                  display: "block", width: 20, height: 20, borderRadius: "50%",
+                  background: c.hex, opacity: 0.9
+                }} />
+              </button>
+            ))}
+          </div>
+          <label className={styles.label} style={{ marginTop: 14 }}>Descripción <span className={styles.opcional}>(opcional)</span></label>
           <textarea
             className={styles.textarea}
             value={descripcion}
@@ -187,7 +237,8 @@ function ModalForm({ inicial, onGuardar, onCerrar }: {
           />
           <div className={styles.modalActions}>
             <button type="button" className={styles.btnSecundario} onClick={onCerrar}>Cancelar</button>
-            <button type="submit" className={styles.btnPrimario} disabled={!nombre.trim() || saving}>
+            <button type="submit" className={styles.btnPrimario} disabled={!nombre.trim() || saving}
+              style={{ background: colorDef.hex }}>
               {saving ? "Guardando…" : inicial?.etiqueta_id ? "Guardar cambios" : "Crear etiqueta"}
             </button>
           </div>
@@ -212,28 +263,29 @@ export default function EtiquetasPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push("/login"); return; }
-      setUserId(session.user.id);
+      const uid = session.user.id;
+      setUserId(uid);
+      supabase.from("Etiquetas")
+        .select("*")
+        .order("nombre")
+        .then(({ data, error }) => {
+          if (!error) setEtiquetas((data as Etiqueta[]) ?? []);
+          setLoading(false);
+        });
     });
   }, [router]);
 
-  useEffect(() => {
-    supabase.from("Etiquetas")
-      .select("etiqueta_id, nombre, descripcion, created_at")
-      .order("nombre")
-      .then(({ data }) => { setEtiquetas((data as Etiqueta[]) ?? []); setLoading(false); });
-  }, []);
-
-  async function crearOEditar(nombre: string, descripcion: string) {
+  async function crearOEditar(nombre: string, descripcion: string, color: string) {
     if (modalForm.editar) {
       const { data } = await supabase.from("Etiquetas")
-        .update({ nombre, descripcion })
+        .update({ nombre, descripcion, color })
         .eq("etiqueta_id", modalForm.editar.etiqueta_id)
         .select()
         .single();
       if (data) setEtiquetas((prev) => prev.map((e) => e.etiqueta_id === data.etiqueta_id ? data : e));
     } else {
       const { data } = await supabase.from("Etiquetas")
-        .insert({ nombre, descripcion })
+        .insert({ nombre, descripcion, color })
         .select()
         .single();
       if (data) setEtiquetas((prev) => [...prev, data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
@@ -299,11 +351,16 @@ export default function EtiquetasPage() {
       ) : (
         <div className={styles.grid}>
           {filtradas.map((e) => (
-            <div key={e.etiqueta_id} className={styles.card}>
+            <div key={e.etiqueta_id} className={styles.card}
+              style={{ borderColor: getColorDef(e.color).border }}>
               <div className={styles.cardTop}>
-                <div className={styles.cardIconWrap}>🔖</div>
+                <div className={styles.cardIconWrap}
+                  style={{ background: getColorDef(e.color).bg, borderColor: getColorDef(e.color).border }}>
+                  🔖
+                </div>
                 <div className={styles.cardInfo}>
-                  <h3 className={styles.cardNombre}>{e.nombre}</h3>
+                  <h3 className={styles.cardNombre}
+                    style={{ color: getColorDef(e.color).hex }}>{e.nombre}</h3>
                   {e.descripcion && <p className={styles.cardDesc}>{e.descripcion}</p>}
                   <span className={styles.cardDate}>{fmtDate(e.created_at)}</span>
                 </div>
@@ -312,13 +369,17 @@ export default function EtiquetasPage() {
                 <button className={styles.btnAccion} onClick={() => setPanelCarpetas(e)} title="Asignar a carpetas">
                   📁 Carpetas
                 </button>
-                <button className={styles.btnAccion} onClick={() => setModalForm({ abierto: true, editar: e })} title="Editar">
-                  ✏️ Editar
-                </button>
-                <button className={`${styles.btnAccion} ${styles.btnAccionPeligro}`}
-                  onClick={() => setConfirmarEliminar(e)} title="Eliminar">
-                  🗑️
-                </button>
+                {e.user_id === userId && (
+                  <>
+                    <button className={styles.btnAccion} onClick={() => setModalForm({ abierto: true, editar: e })} title="Editar">
+                      ✏️ Editar
+                    </button>
+                    <button className={`${styles.btnAccion} ${styles.btnAccionPeligro}`}
+                      onClick={() => setConfirmarEliminar(e)} title="Eliminar">
+                      🗑️
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

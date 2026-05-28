@@ -352,8 +352,8 @@ if (etiquetaIds.length > 0) {
           </button>
           <div className={styles.logo}>
             <span className={styles.logoIcon}>🗂</span>
-            GESTOR DE LINKS
-          </div>
+              Oniric Archive          
+            </div>
           <nav className={styles.topNav}>
             <button className={styles.btnPrimary} onClick={() => {
               setDefaultParentId(selectedId);

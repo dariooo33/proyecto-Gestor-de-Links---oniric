@@ -6,7 +6,22 @@ import { fmtDate } from "../helpers";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "../page.module.css";
 
-interface Etiqueta { etiqueta_id: string; nombre: string; descripcion?: string; }
+interface Etiqueta { etiqueta_id: string; nombre: string; descripcion?: string; color?: string | null; }
+
+const ETIQUETA_COLORS: Record<string, { hex: string; bg: string; border: string }> = {
+  green:  { hex: "#4ecb8d", bg: "rgba(78,203,141,.15)",  border: "rgba(78,203,141,.35)"  },
+  blue:   { hex: "#60a5fa", bg: "rgba(96,165,250,.15)",  border: "rgba(96,165,250,.35)"  },
+  purple: { hex: "#a78bfa", bg: "rgba(167,139,250,.15)", border: "rgba(167,139,250,.35)" },
+  pink:   { hex: "#f472b6", bg: "rgba(244,114,182,.15)", border: "rgba(244,114,182,.35)" },
+  orange: { hex: "#fb923c", bg: "rgba(251,146,60,.15)",  border: "rgba(251,146,60,.35)"  },
+  yellow: { hex: "#fbbf24", bg: "rgba(251,191,36,.15)",  border: "rgba(251,191,36,.35)"  },
+  red:    { hex: "#f87171", bg: "rgba(248,113,113,.15)", border: "rgba(248,113,113,.35)" },
+  cyan:   { hex: "#22d3ee", bg: "rgba(34,211,238,.15)",  border: "rgba(34,211,238,.35)"  },
+  gray:   { hex: "#94a3b8", bg: "rgba(148,163,184,.15)", border: "rgba(148,163,184,.35)" },
+};
+function getEtiquetaColor(color?: string | null) {
+  return ETIQUETA_COLORS[color ?? "green"] ?? ETIQUETA_COLORS.green;
+}
 
 // Tipos intermedios para resultados de join de Supabase
 interface EtiquetaRelacion { etiqueta_id: string; }
@@ -52,14 +67,19 @@ function EtiquetasPicker({
   return (
     <div>
       <div className={styles.etiquetaSelectorWrap}>
-        {etiquetas.map((e) => (
-          <button key={e.etiqueta_id} type="button"
-            className={`${styles.etiquetaChip} ${seleccionadas.includes(e.etiqueta_id) ? styles.etiquetaChipOn : ""}`}
-            disabled={saving}
-            onClick={() => onToggle(e.etiqueta_id)}>
-            {e.nombre}
-          </button>
-        ))}
+        {etiquetas.map((e) => {
+          const on = seleccionadas.includes(e.etiqueta_id);
+          const ec = getEtiquetaColor(e.color);
+          return (
+            <button key={e.etiqueta_id} type="button"
+              className={`${styles.etiquetaChip} ${on ? styles.etiquetaChipOn : ""}`}
+              style={on ? { background: ec.bg, borderColor: ec.hex, color: ec.hex } : undefined}
+              disabled={saving}
+              onClick={() => onToggle(e.etiqueta_id)}>
+              {e.nombre}
+            </button>
+          );
+        })}
         {etiquetas.length === 0 && !creando && (
           <span className={styles.etiquetaEmpty}>No hay etiquetas aún</span>
         )}
@@ -169,7 +189,7 @@ export function CenterPanel({
   // Cargar catálogos globales una sola vez
   useEffect(() => {
     Promise.all([
-      supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion").order("nombre"),
+      supabase.from("Etiquetas").select("etiqueta_id, nombre, descripcion, color").order("nombre"),
       supabase.from("Categorias").select("categoria_id, nombre").order("nombre"),
     ]).then(([{ data: etqs }, { data: cats }]) => {
       setTodasEtiquetas((etqs as Etiqueta[]) ?? []);
@@ -456,9 +476,15 @@ export function CenterPanel({
             {categoriaActualNombre && (
               <span className={styles.categoriaBadge}>🏷️ {categoriaActualNombre}</span>
             )}
-            {etiquetasCarpetaObj.map((e) => (
-              <span key={e.etiqueta_id} className={styles.etiquetaBadge}>{e.nombre}</span>
-            ))}
+            {etiquetasCarpetaObj.map((e) => {
+              const ec = getEtiquetaColor(e.color);
+              return (
+                <span key={e.etiqueta_id} className={styles.etiquetaBadge}
+                  style={{ background: ec.bg, color: ec.hex, borderColor: ec.border }}>
+                  {e.nombre}
+                </span>
+              );
+            })}
           </div>
           <div className={styles.folderHeaderMeta}>
             {subCarpetas.length} subcarpeta{subCarpetas.length !== 1 ? "s" : ""}
@@ -675,9 +701,15 @@ export function CenterPanel({
                         🔗 URL
                       </a>
                     )}
-                    {etiObjs.map((e) => (
-                      <span key={e.etiqueta_id} className={styles.etiquetaBadgeSmall}>{e.nombre}</span>
-                    ))}
+                    {etiObjs.map((e) => {
+                      const ec = getEtiquetaColor(e.color);
+                      return (
+                        <span key={e.etiqueta_id} className={styles.etiquetaBadgeSmall}
+                          style={{ background: ec.bg, color: ec.hex, borderColor: ec.border }}>
+                          {e.nombre}
+                        </span>
+                      );
+                    })}
                     <span className={styles.resourceDate}>{fmtDate(r.created_at)}</span>
                     {canEdit && (
                       <span className={styles.resourceDelete}>

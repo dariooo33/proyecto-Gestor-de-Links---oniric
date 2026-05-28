@@ -61,7 +61,6 @@ export default function Header() {
 
           {/* Links derecha — desktop */}
           <div className={`${styles.derecha} ${styles.derechaDesktop}`}>
-            <li><a href="/">MENU</a></li>
             <li><a href="/categorias">CATEGORÍAS</a></li>
             <li><a href="/etiquetas">ETIQUETAS</a></li>
             {usuario === undefined ? (

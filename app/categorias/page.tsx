@@ -10,6 +10,7 @@ interface Categoria {
   nombre: string;
   descripcion: string;
   created_at: string;
+  user_id: string;
 }
 
 interface Carpeta {
@@ -212,16 +213,17 @@ export default function CategoriasPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.push("/login"); return; }
-      setUserId(session.user.id);
+      const uid = session.user.id;
+      setUserId(uid);
+      supabase.from("Categorias")
+        .select("*")
+        .order("nombre")
+        .then(({ data, error }) => {
+          if (!error) setCategorias((data as Categoria[]) ?? []);
+          setLoading(false);
+        });
     });
   }, [router]);
-
-  useEffect(() => {
-    supabase.from("Categorias")
-      .select("categoria_id, nombre, descripcion, created_at")
-      .order("nombre")
-      .then(({ data }) => { setCategorias((data as Categoria[]) ?? []); setLoading(false); });
-  }, []);
 
   async function crearOEditar(nombre: string, descripcion: string) {
     if (modalForm.editar) {
@@ -312,13 +314,17 @@ export default function CategoriasPage() {
                 <button className={styles.btnAccion} onClick={() => setPanelCarpetas(c)} title="Asignar a carpetas">
                   📁 Carpetas
                 </button>
-                <button className={styles.btnAccion} onClick={() => setModalForm({ abierto: true, editar: c })} title="Editar">
-                  ✏️ Editar
-                </button>
-                <button className={`${styles.btnAccion} ${styles.btnAccionPeligro}`}
-                  onClick={() => setConfirmarEliminar(c)} title="Eliminar">
-                  🗑️
-                </button>
+                {(c.user_id === userId)&& (
+                  <>
+                    <button className={styles.btnAccion} onClick={() => setModalForm({ abierto: true, editar: c })} title="Editar">
+                      ✏️ Editar
+                    </button>
+                    <button className={`${styles.btnAccion} ${styles.btnAccionPeligro}`}
+                      onClick={() => setConfirmarEliminar(c)} title="Eliminar">
+                      🗑️
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
