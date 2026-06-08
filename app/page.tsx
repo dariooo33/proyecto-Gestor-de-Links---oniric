@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,7 +12,8 @@ import { ModalCarpeta, ModalRecurso, ModalConfirm } from "./components/Modals";
 import { ModalPermisos } from "./components/ModalPermisos";
 import styles from "./page.module.css";
 
-export default function Home() {
+// ── Componente interno que usa useSearchParams ────────────────────────────
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -161,39 +163,39 @@ export default function Home() {
     if (error || !nueva) { setError(error?.message ?? "Error al crear carpeta"); return; }
 
     const ops: Promise<unknown>[] = [];
-if (parentId) {
-  const padre = carpetas.find((c) => c.carpeta_id === parentId);
-  if (padre && padre.user_id !== userId) {
-    ops.push(Promise.resolve(supabase.from("Permisos").upsert({
-      carpeta_id: nueva.carpeta_id,
-      owner_id: userId,
-      user_id: padre.user_id,
-      nivel: "edicion",
-    }, { onConflict: "carpeta_id,user_id" })).then(({ error: permError }) => {
-      if (permError) setError(`Carpeta creada pero error al asignar permisos: ${permError.message}`);
-    }));
-  }
-}
+    if (parentId) {
+      const padre = carpetas.find((c) => c.carpeta_id === parentId);
+      if (padre && padre.user_id !== userId) {
+        ops.push(Promise.resolve(supabase.from("Permisos").upsert({
+          carpeta_id: nueva.carpeta_id,
+          owner_id: userId,
+          user_id: padre.user_id,
+          nivel: "edicion",
+        }, { onConflict: "carpeta_id,user_id" })).then(({ error: permError }) => {
+          if (permError) setError(`Carpeta creada pero error al asignar permisos: ${permError.message}`);
+        }));
+      }
+    }
 
-if (categoriaId) {
-  ops.push(
-    Promise.resolve(supabase.from("Carpetas_Recrusos_Categoria").insert({
-      carpeta_id: nueva.carpeta_id,
-      categoria_id: categoriaId,
-    })).then(({ error: catError }) => {
-      if (catError) setError(`Carpeta creada pero error al asignar categoría: ${catError.message}`);
-    })
-  );
-}
+    if (categoriaId) {
+      ops.push(
+        Promise.resolve(supabase.from("Carpetas_Recrusos_Categoria").insert({
+          carpeta_id: nueva.carpeta_id,
+          categoria_id: categoriaId,
+        })).then(({ error: catError }) => {
+          if (catError) setError(`Carpeta creada pero error al asignar categoría: ${catError.message}`);
+        })
+      );
+    }
 
-if (etiquetaIds.length > 0) {
-  const rows = etiquetaIds.map((eid) => ({ carpeta_id: nueva.carpeta_id, etiqueta_id: eid }));
-  ops.push(
-    Promise.resolve(supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows)).then(({ error: etqError }) => {
-      if (etqError) setError(`Carpeta creada pero error al asignar etiquetas: ${etqError.message}`);
-    })
-  );
-}
+    if (etiquetaIds.length > 0) {
+      const rows = etiquetaIds.map((eid) => ({ carpeta_id: nueva.carpeta_id, etiqueta_id: eid }));
+      ops.push(
+        Promise.resolve(supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows)).then(({ error: etqError }) => {
+          if (etqError) setError(`Carpeta creada pero error al asignar etiquetas: ${etqError.message}`);
+        })
+      );
+    }
 
     await Promise.all(ops);
     await loadCarpetas();
@@ -206,10 +208,8 @@ if (etiquetaIds.length > 0) {
     setConfirm({
       message: `¿Eliminar la carpeta "${nombre}" y todo su contenido?`,
       onConfirm: async () => {
-        // Borrar etiquetas y categorías por carpeta_id directamente
         await supabase.from("Carpetas_Recrusos_Etiquetas").delete().eq("carpeta_id", carpetaId);
         await supabase.from("Carpetas_Recrusos_Categoria").delete().eq("carpeta_id", carpetaId);
-        // Borrar los recursos de la carpeta
         await supabase.from("Recursos").delete().eq("carpeta_id", carpetaId);
 
         const { error } = await supabase.from("Carpetas").delete().eq("carpeta_id", carpetaId);
@@ -278,7 +278,6 @@ if (etiquetaIds.length > 0) {
     recursoId: string | null,
     etiquetaIds: string[]
   ) {
-    // Guard: se requiere al menos uno de los dos IDs para no borrar toda la tabla
     if (!carpetaId && !recursoId) return;
 
     const deleteQuery = supabase.from("Carpetas_Recrusos_Etiquetas").delete();
@@ -471,5 +470,14 @@ if (etiquetaIds.length > 0) {
         <div className={styles.errorToast} onClick={() => setError(null)}>⚠ {error}</div>
       )}
     </>
+  );
+}
+
+// ── Export principal con Suspense ─────────────────────────────────────────
+export default function Home() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32 }}>Cargando…</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

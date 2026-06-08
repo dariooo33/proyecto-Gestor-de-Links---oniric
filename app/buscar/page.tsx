@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -157,7 +158,8 @@ function EtiquetasDropdown({
   );
 }
 
-export default function BuscarPage() {
+// ── Componente interno que usa useSearchParams ────────────────────────────
+function BuscarContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryParam = searchParams.get("q") ?? "";
@@ -474,8 +476,6 @@ export default function BuscarPage() {
           <span style={{ width: 1, background: "var(--border)", alignSelf: "stretch", margin: "0 4px" }} />
         )}
 
-        {/* Filtros avanzados: siempre visibles, funcionan en exploración y en resultados */}
-
         {categorias.length > 0 && (
           <select
             className={`${styles.filtroBtn} ${categoriaFiltro ? styles.filtroBtnActive : ""}`}
@@ -634,3 +634,12 @@ export default function BuscarPage() {
     </div>
   );
 }
+
+// ── Export principal con Suspense ─────────────────────────────────────────
+export default function BuscarPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32 }}>Cargando…</div>}>
+      <BuscarContent />
+    </Suspense>
+  );
+} 
