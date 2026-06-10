@@ -223,10 +223,32 @@ export default function UsuarioPage() {
                   <div className={styles.sectionTitle}>Recursos</div>
                   <div className={styles.resourceList}>
                     {recursos.map((r) => (
-                      <div key={r.recurso_id} className={styles.resourceRow}>
-                        <span className={styles.resourceIcon}>📄</span>
-                        <span className={styles.resourceName}>{r.nombre}</span>
-                        <span className={styles.resourceDate}>{fmtDate(r.created_at)}</span>
+                      <div key={r.recurso_id}>
+                        <div className={styles.resourceRow}>
+                          <span className={styles.resourceIcon}>{r.url ? "🔗" : "📄"}</span>
+                          <span className={styles.resourceName}>
+                            {r.url ? (
+                              <a href={r.url} target="_blank" rel="noopener noreferrer" className={styles.resourceLink}>
+                                {r.nombre}
+                              </a>
+                            ) : (
+                              <span>{r.nombre}</span>
+                            )}
+                          </span>
+                          {r.url && (
+                            <a href={r.url} target="_blank" rel="noopener noreferrer"
+                              className={styles.resourceUrlChip}
+                              onClick={(e) => e.stopPropagation()} title={r.url}>
+                              🔗 URL
+                            </a>
+                          )}
+                          <span className={styles.resourceDate}>{fmtDate(r.created_at)}</span>
+                        </div>
+                        {r.contenido && (
+                          <div style={{ paddingLeft: 32, paddingBottom: 8, opacity: 0.7, fontSize: 13 }}>
+                            {r.contenido}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

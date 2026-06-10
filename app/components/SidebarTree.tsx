@@ -478,6 +478,7 @@ export function SidebarTree({
   const draggingRecursoIdRef = useRef<string | null>(null);
   const [dragOverRecursoId, setDragOverRecursoId] = useState<string | null>(null);
   const [editingRecurso, setEditingRecurso] = useState<Recurso | null>(null);
+  const [recursosRaiz, setRecursosRaiz] = useState<Recurso[]>([]);
 
   // Cargar recursos de las carpetas expandidas
   useEffect(() => {
@@ -498,8 +499,15 @@ export function SidebarTree({
     });
   }, [showRecursos, expandedIds, refreshTrigger]);
 
+  // Cargar recursos de raíz (sin carpeta)
   useEffect(() => {
-    if (!showRecursos) setRecursos({});
+    if (!showRecursos || !userId) { setRecursosRaiz([]); return; }
+    supabase.from("Recursos").select("*").eq("user_id", userId).is("carpeta_id", null).order("created_at")
+      .then(({ data }) => setRecursosRaiz((data as Recurso[]) ?? []));
+  }, [showRecursos, userId, refreshTrigger]);
+
+  useEffect(() => {
+    if (!showRecursos) { setRecursos({}); setRecursosRaiz([]); }
   }, [showRecursos]);
 
   function handleContextMenu(e: React.MouseEvent, node: TreeNode) {
@@ -537,14 +545,18 @@ export function SidebarTree({
     supabase.from("Recursos").update({ nombre: nuevoNombre.trim() }).eq("recurso_id", id)
       .then(({ error }) => {
         if (!error) {
-          setRecursos((prev) => {
-            const next = { ...prev };
-            for (const key of Object.keys(next)) {
-              next[key] = next[key].map((r) => r.recurso_id === id ? { ...r, nombre: nuevoNombre.trim() } : r);
-            }
-            return next;
-          });
-          onRefreshRecursos(carpetaId);
+          if (carpetaId) {
+            setRecursos((prev) => {
+              const next = { ...prev };
+              for (const key of Object.keys(next)) {
+                next[key] = next[key].map((r) => r.recurso_id === id ? { ...r, nombre: nuevoNombre.trim() } : r);
+              }
+              return next;
+            });
+            onRefreshRecursos(carpetaId);
+          } else {
+            setRecursosRaiz((prev) => prev.map((r) => r.recurso_id === id ? { ...r, nombre: nuevoNombre.trim() } : r));
+          }
         }
       });
   }
@@ -648,6 +660,36 @@ export function SidebarTree({
         />
       ))}
 
+      {/* ── Recursos sin carpeta ──────────────────────────────────────── */}
+      {showRecursos && recursosRaiz.length > 0 && (
+        <div>
+          <div className={styles.sidebarRecursosSectionTitle} style={{
+            padding: "6px 10px",
+            fontSize: 11,
+            opacity: 0.5,
+            fontWeight: 600,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}>
+            Sin carpeta
+          </div>
+          {recursosRaiz.map((r) => (
+            <RecursoRow
+              key={r.recurso_id}
+              recurso={r}
+              depth={-1}
+              draggingRecursoId={draggingRecursoId}
+              dragOverRecursoId={dragOverRecursoId}
+              renamingRecursoId={renamingRecursoId}
+              onContextMenu={handleRecursoContextMenu}
+              onRenameSubmit={handleRecursoRenameSubmit}
+              onDragStart={(id) => { setDraggingRecursoId(id); draggingRecursoIdRef.current = id; }}
+              onDragEnd={() => { setDraggingRecursoId(null); draggingRecursoIdRef.current = null; setDragOverRecursoId(null); }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* ── Zona de soltar en raíz ──────────────────────────────────────── */}
       {(draggingId || draggingRecursoId) && (
         <div
@@ -701,6 +743,7 @@ export function SidebarTree({
               }
               return next;
             });
+            setRecursosRaiz((prev) => prev.filter((r) => r.recurso_id !== id));
           }}
           onEdit={(r) => setEditingRecurso(r)}
         />

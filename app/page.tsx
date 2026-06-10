@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Carpeta, Recurso, NivelAcceso } from "./types";
@@ -12,7 +11,16 @@ import { ModalCarpeta, ModalRecurso, ModalConfirm } from "./components/Modals";
 import { ModalPermisos } from "./components/ModalPermisos";
 import styles from "./page.module.css";
 
-// ── Componente interno que usa useSearchParams ────────────────────────────
+// Carpeta virtual para recursos en raíz
+const RAIZ_VIRTUAL: Carpeta = {
+  carpeta_id: "__RAIZ__",
+  user_id: "",
+  id_padre: null,
+  nombre: "Sin carpeta",
+  created_at: "",
+  publica: false,
+};
+
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -21,6 +29,7 @@ function HomeContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [recursos, setRecursos] = useState<Recurso[]>([]);
+  const [recursosRaiz, setRecursosRaiz] = useState<Recurso[]>([]);
   const [permisosRecibidos, setPermisosRecibidos] = useState<{ carpeta_id: string; nivel: "lectura" | "edicion" }[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -33,13 +42,8 @@ function HomeContent() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Modal de confirmación reutilizable
   const [confirm, setConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
-
-  // parentId preseleccionado al abrir modal desde el menú contextual
   const [defaultParentId, setDefaultParentId] = useState<string | null>(null);
-
-  // carpeta sobre la que se abre el modal de permisos
   const [carpetaPermisos, setCarpetaPermisos] = useState<Carpeta | null>(null);
 
   // ── Sesión ───────────────────────────────────────────────────────────────
@@ -81,7 +85,19 @@ function HomeContent() {
     setLoadingTree(false);
   }, [userId]);
 
-  // ── Cargar recursos ──────────────────────────────────────────────────────
+  // ── Cargar recursos de raíz ──────────────────────────────────────────────
+  const loadRecursosRaiz = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from("Recursos")
+      .select("*")
+      .eq("user_id", userId)
+      .is("carpeta_id", null)
+      .order("created_at");
+    setRecursosRaiz((data as Recurso[]) ?? []);
+  }, [userId]);
+
+  // ── Cargar recursos de una carpeta ───────────────────────────────────────
   const loadRecursos = useCallback(async (carpetaId: string) => {
     setLoadingCenter(true);
     const { data, error } = await supabase
@@ -91,7 +107,7 @@ function HomeContent() {
     setLoadingCenter(false);
   }, []);
 
-  useEffect(() => { if (userId) loadCarpetas(); }, [userId, loadCarpetas]);
+  useEffect(() => { if (userId) { loadCarpetas(); loadRecursosRaiz(); } }, [userId, loadCarpetas, loadRecursosRaiz]);
 
   useEffect(() => {
     if (!highlightId || carpetas.length === 0) return;
@@ -117,13 +133,20 @@ function HomeContent() {
   }, [highlightId, carpetas, userId, router]);
 
   useEffect(() => {
-    if (selectedId) loadRecursos(selectedId);
-    else setRecursos([]);
-  }, [selectedId, loadRecursos]);
+    if (selectedId === "__RAIZ__") {
+      loadRecursosRaiz();
+      setRecursos([]);
+    } else if (selectedId) {
+      loadRecursos(selectedId);
+    } else {
+      setRecursos([]);
+    }
+  }, [selectedId, loadRecursos, loadRecursosRaiz]);
 
-  // ── Nivel de acceso (memoizado) ──────────────────────────────────────────
+  // ── Nivel de acceso ──────────────────────────────────────────────────────
   const nivelAcceso: NivelAcceso = useMemo(() => {
     if (!selectedId || !userId) return null;
+    if (selectedId === "__RAIZ__") return "owner";
     const carpeta = carpetas.find((c) => c.carpeta_id === selectedId);
     if (!carpeta) return null;
     if (carpeta.user_id === userId) return "owner";
@@ -211,7 +234,6 @@ function HomeContent() {
         await supabase.from("Carpetas_Recrusos_Etiquetas").delete().eq("carpeta_id", carpetaId);
         await supabase.from("Carpetas_Recrusos_Categoria").delete().eq("carpeta_id", carpetaId);
         await supabase.from("Recursos").delete().eq("carpeta_id", carpetaId);
-
         const { error } = await supabase.from("Carpetas").delete().eq("carpeta_id", carpetaId);
         if (error) { setError(error.message); return; }
         if (selectedId === carpetaId) setSelectedId(null);
@@ -221,35 +243,23 @@ function HomeContent() {
   }
 
   async function handleRenameCarpeta(carpetaId: string, nuevoNombre: string) {
-    const { error } = await supabase
-      .from("Carpetas")
-      .update({ nombre: nuevoNombre })
-      .eq("carpeta_id", carpetaId);
+    const { error } = await supabase.from("Carpetas").update({ nombre: nuevoNombre }).eq("carpeta_id", carpetaId);
     if (error) { setError(error.message); return; }
     await loadCarpetas();
   }
 
   async function handleMoveCarpeta(draggedId: string, targetId: string | null) {
     if (draggedId === targetId) return;
-
     const esDescendiente = (posibleHijoId: string, raizId: string): boolean => {
       const hijos = carpetas.filter((c) => c.id_padre === raizId);
-      return hijos.some(
-        (h) => h.carpeta_id === posibleHijoId || esDescendiente(posibleHijoId, h.carpeta_id)
-      );
+      return hijos.some((h) => h.carpeta_id === posibleHijoId || esDescendiente(posibleHijoId, h.carpeta_id));
     };
-
     if (targetId && esDescendiente(targetId, draggedId)) {
       setError("No puedes mover una carpeta dentro de una de sus subcarpetas.");
       return;
     }
-
-    const { error } = await supabase
-      .from("Carpetas")
-      .update({ id_padre: targetId })
-      .eq("carpeta_id", draggedId);
+    const { error } = await supabase.from("Carpetas").update({ id_padre: targetId }).eq("carpeta_id", draggedId);
     if (error) { setError(error.message); return; }
-
     if (targetId) setExpandedIds((prev) => new Set([...prev, targetId]));
     await loadCarpetas();
   }
@@ -265,25 +275,17 @@ function HomeContent() {
   async function handleSetCategoria(carpetaId: string, categoriaId: string | null) {
     await supabase.from("Carpetas_Recrusos_Categoria").delete().eq("carpeta_id", carpetaId);
     if (categoriaId) {
-      const { error } = await supabase.from("Carpetas_Recrusos_Categoria").insert({
-        carpeta_id: carpetaId, categoria_id: categoriaId,
-      });
+      const { error } = await supabase.from("Carpetas_Recrusos_Categoria").insert({ carpeta_id: carpetaId, categoria_id: categoriaId });
       if (error) { setError(error.message); return; }
     }
     await loadCarpetas();
   }
 
-  async function handleSetEtiquetas(
-    carpetaId: string | null,
-    recursoId: string | null,
-    etiquetaIds: string[]
-  ) {
+  async function handleSetEtiquetas(carpetaId: string | null, recursoId: string | null, etiquetaIds: string[]) {
     if (!carpetaId && !recursoId) return;
-
     const deleteQuery = supabase.from("Carpetas_Recrusos_Etiquetas").delete();
     if (carpetaId) await deleteQuery.eq("carpeta_id", carpetaId);
     else if (recursoId) await deleteQuery.eq("recurso_id", recursoId);
-
     if (etiquetaIds.length > 0) {
       const rows = etiquetaIds.map((eid) => ({
         ...(carpetaId ? { carpeta_id: carpetaId } : {}),
@@ -296,19 +298,22 @@ function HomeContent() {
   }
 
   async function handleCreateRecurso(nombre: string, contenido: string, etiquetaIds: string[], url: string) {
-    if (!selectedId || !userId) return;
+    if (!userId) return;
+    const carpetaId = selectedId === "__RAIZ__" ? null : selectedId;
     const { data: nuevo, error } = await supabase.from("Recursos")
-      .insert({ user_id: userId, carpeta_id: selectedId, nombre, contenido, url: url || null })
+      .insert({ user_id: userId, carpeta_id: carpetaId, nombre, contenido, url: url || null })
       .select("recurso_id").single();
     if (error || !nuevo) { setError(error?.message ?? "Error al crear recurso"); return; }
-
     if (etiquetaIds.length > 0) {
       const rows = etiquetaIds.map((eid) => ({ recurso_id: nuevo.recurso_id, etiqueta_id: eid }));
       const { error: etqError } = await supabase.from("Carpetas_Recrusos_Etiquetas").insert(rows);
       if (etqError) setError(`Recurso creado pero error al asignar etiquetas: ${etqError.message}`);
     }
-
-    await loadRecursos(selectedId);
+    if (selectedId === "__RAIZ__") {
+      await loadRecursosRaiz();
+    } else if (selectedId) {
+      await loadRecursos(selectedId);
+    }
     setShowModalRecurso(false);
     setSidebarRefreshTrigger((v) => v + 1);
   }
@@ -319,7 +324,11 @@ function HomeContent() {
       onConfirm: async () => {
         const { error } = await supabase.from("Recursos").delete().eq("recurso_id", recursoId);
         if (error) { setError(error.message); return; }
-        if (selectedId) await loadRecursos(selectedId);
+        if (selectedId === "__RAIZ__") {
+          await loadRecursosRaiz();
+        } else if (selectedId) {
+          await loadRecursos(selectedId);
+        }
         setSidebarRefreshTrigger((v) => v + 1);
       },
     });
@@ -330,8 +339,7 @@ function HomeContent() {
     setConfirm({
       message: "¿Quieres eliminar tu acceso a esta carpeta compartida?",
       onConfirm: async () => {
-        const { error } = await supabase.from("Permisos")
-          .delete().eq("carpeta_id", carpetaId).eq("user_id", userId);
+        const { error } = await supabase.from("Permisos").delete().eq("carpeta_id", carpetaId).eq("user_id", userId);
         if (error) { setError(error.message); return; }
         setSelectedId(null);
         await loadCarpetas();
@@ -339,8 +347,16 @@ function HomeContent() {
     });
   }
 
-  const selectedCarpeta = carpetas.find((c) => c.carpeta_id === selectedId) ?? null;
-  const subCarpetas = carpetas.filter((c) => c.id_padre === selectedId);
+  // Si selectedId es "__RAIZ__", usamos la carpeta virtual y los recursos de raíz
+  const selectedCarpeta = selectedId === "__RAIZ__"
+    ? { ...RAIZ_VIRTUAL, user_id: userId ?? "" }
+    : carpetas.find((c) => c.carpeta_id === selectedId) ?? null;
+
+  const recursosActivos = selectedId === "__RAIZ__" ? recursosRaiz : recursos;
+  const subCarpetas = selectedId === "__RAIZ__" ? [] : carpetas.filter((c) => c.id_padre === selectedId);
+
+  // Mostrar botón "Sin carpeta" en sidebar solo si hay recursos en raíz
+  const tieneRecursosRaiz = recursosRaiz.length > 0;
 
   return (
     <>
@@ -351,11 +367,11 @@ function HomeContent() {
           </button>
           <div className={styles.logo}>
             <span className={styles.logoIcon}>🗂</span>
-              Oniric Archive          
-            </div>
+            Oniric Archive
+          </div>
           <nav className={styles.topNav}>
             <button className={styles.btnPrimary} onClick={() => {
-              setDefaultParentId(selectedId);
+              setDefaultParentId(selectedId === "__RAIZ__" ? null : selectedId);
               setShowModalCarpeta(true);
             }}>
               + Nueva Carpeta
@@ -369,6 +385,9 @@ function HomeContent() {
           <div className={styles.sidebarHeader}>
             <span className={styles.sidebarTitle}>Carpetas</span>
           </div>
+
+
+
           {loadingTree ? (
             <div className={styles.sidebarEmpty}>Cargando…</div>
           ) : tree.length === 0 ? (
@@ -411,9 +430,12 @@ function HomeContent() {
 
         <div className={styles.center}>
           <CenterPanel
-            carpeta={selectedCarpeta} subCarpetas={subCarpetas}
-            recursos={recursos} loading={loadingCenter}
-            userId={userId} nivelAcceso={nivelAcceso}
+            carpeta={selectedCarpeta}
+            subCarpetas={subCarpetas}
+            recursos={recursosActivos}
+            loading={loadingCenter}
+            userId={userId}
+            nivelAcceso={nivelAcceso}
             onSelectCarpeta={(id) => { setSelectedId(id); setExpandedIds((prev) => new Set([...prev, id])); }}
             onNewRecurso={() => setShowModalRecurso(true)}
             onDeleteRecurso={handleDeleteRecurso}
@@ -423,13 +445,12 @@ function HomeContent() {
             onTogglePublica={handleTogglePublica}
             onSetCategoria={handleSetCategoria}
             onSetEtiquetas={handleSetEtiquetas}
-            onRenameRecurso={(recursoId, nuevoNombre) => {
+            onRenameRecurso={() => {
               setSidebarRefreshTrigger((n) => n + 1);
-              loadRecursos(selectedId!);
+              if (selectedId === "__RAIZ__") loadRecursosRaiz();
+              else if (selectedId) loadRecursos(selectedId);
             }}
-            onRenameCarpeta={(carpetaId, nuevoNombre) => {
-              loadCarpetas();
-            }}
+            onRenameCarpeta={() => { loadCarpetas(); }}
           />
         </div>
       </main>
@@ -443,10 +464,10 @@ function HomeContent() {
           onSave={handleCreateCarpeta}
         />
       )}
-      {showModalRecurso && selectedId && (
+      {showModalRecurso && (selectedId === "__RAIZ__" || selectedId) && (
         <ModalRecurso onClose={() => setShowModalRecurso(false)} onSave={handleCreateRecurso} />
       )}
-      {showModalPermisos && (carpetaPermisos ?? selectedCarpeta) && userId && (
+      {showModalPermisos && (carpetaPermisos ?? selectedCarpeta) && userId && selectedId !== "__RAIZ__" && (
         <ModalPermisos
           carpeta={(carpetaPermisos ?? selectedCarpeta)!}
           userId={userId}
@@ -473,7 +494,6 @@ function HomeContent() {
   );
 }
 
-// ── Export principal con Suspense ─────────────────────────────────────────
 export default function Home() {
   return (
     <Suspense fallback={<div style={{ padding: 32 }}>Cargando…</div>}>

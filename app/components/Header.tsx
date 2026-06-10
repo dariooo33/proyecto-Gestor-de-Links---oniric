@@ -63,6 +63,7 @@ export default function Header() {
           <div className={`${styles.derecha} ${styles.derechaDesktop}`}>
             <li><a href="/categorias">CATEGORÍAS</a></li>
             <li><a href="/etiquetas">ETIQUETAS</a></li>
+            
             {usuario === undefined ? (
               <li className={styles.cargando}>...</li>
             ) : usuario ? (
